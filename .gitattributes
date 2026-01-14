@@ -1,0 +1,14 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text eol=lf
+
+# Database files (binary)
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Ignore OS files
+.DS_Store binary
+Thumbs.db binary
