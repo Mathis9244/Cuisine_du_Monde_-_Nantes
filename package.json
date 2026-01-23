@@ -1,0 +1,14 @@
+{
+  "name": "cuisine-du-monde",
+  "version": "1.0.0",
+  "description": "Récupération des restaurants à Nantes depuis OpenStreetMap avec Bun",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "dev": "bun run src/server.ts",
+    "fetch": "bun run src/index.ts"
+  },
+  "keywords": ["osm", "openstreetmap", "restaurants", "nantes", "railway"],
+  "author": "",
+  "license": "MIT"
+}

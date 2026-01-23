@@ -1,264 +1,199 @@
-# 🍽️ Cuisine du Monde - Scraper de Restaurants
+# 🍽️ Cuisine du Monde - Restaurants Nantes API
 
-Scraper web gratuit et open-source pour récupérer des informations sur les restaurants étrangers depuis différents sites web.
+API pour récupérer les restaurants à Nantes avec leurs types de cuisines depuis **OpenStreetMap**, utilisant **Bun** et déployable sur **Railway**.
 
-## 📋 Description
+## 🚀 Déploiement sur Railway
 
-Ce projet permet de scraper des informations sur les restaurants depuis plusieurs sources web :
-- **TripAdvisor** - Annuaire de restaurants avec avis
-- **La Fourchette** - Plateforme de réservation de restaurants
-- **Google Maps** (expérimental) - Recherche de restaurants
+### Méthode 1 : Via GitHub (Recommandé)
 
-Les données sont stockées dans une base de données SQLite locale et peuvent être exportées en CSV ou JSON.
+1. **Poussez votre code sur GitHub**
+   ```bash
+   git add .
+   git commit -m "Initial commit"
+   git push origin main
+   ```
 
-## ⚠️ Avertissement Important
+2. **Connectez Railway à GitHub**
+   - Allez sur [railway.app](https://railway.app)
+   - Créez un compte ou connectez-vous
+   - Cliquez sur "New Project"
+   - Sélectionnez "Deploy from GitHub repo"
+   - Choisissez votre repository
 
-Ce projet est fourni à des fins **éducatives et de recherche**. Avant d'utiliser ce scraper :
+3. **Railway détectera automatiquement Bun**
+   - Railway utilisera le `Procfile` ou `railway.json`
+   - Le serveur démarrera automatiquement
 
-- ✅ Respectez les fichiers `robots.txt` de chaque site
-- ✅ Vérifiez les conditions d'utilisation de chaque site web
-- ✅ N'utilisez pas ce scraper à des fins commerciales sans autorisation
-- ✅ Respectez les limites de taux de requêtes (délais entre requêtes)
-- ✅ Respectez les lois sur le scraping web de votre pays
-- ✅ Utilisez les données de manière éthique et légale
-
-## 🚀 Installation
-
-### Prérequis
-
-- Python 3.7 ou supérieur
-- pip (gestionnaire de paquets Python)
-
-### Étapes d'installation
-
-1. **Cloner le projet** :
-```bash
-git clone https://github.com/VOTRE_USERNAME/cuisine_du_monde.git
-cd cuisine_du_monde
-```
-
-2. **Installer les dépendances** :
-```bash
-pip install -r requirements.txt
-```
-
-## 📖 Utilisation
-
-### Utilisation en ligne de commande
-
-Lancez le scraper avec :
+### Méthode 2 : Via Railway CLI
 
 ```bash
-python web_scraper.py
+# Installer Railway CLI
+npm i -g @railway/cli
+
+# Se connecter
+railway login
+
+# Initialiser le projet
+railway init
+
+# Déployer
+railway up
 ```
 
-Le script vous guidera pour :
-- Choisir la ville à scraper
-- Sélectionner les sources (TripAdvisor, La Fourchette, ou toutes)
-- Afficher les statistiques des données récupérées
+## 📡 API Endpoints
 
-### Utilisation programmatique
+Une fois déployé, votre API sera disponible sur `https://votre-projet.railway.app`
 
-```python
-from web_scraper import WebRestaurantScraper
+### GET `/api/restaurants`
+Récupère tous les restaurants
 
-# Créer une instance du scraper
-scraper = WebRestaurantScraper(db_name='mes_restaurants.db')
+**Query params:**
+- `cuisine` - Filtrer par cuisine (ex: `?cuisine=italian`)
+- `limit` - Limiter le nombre de résultats (ex: `?limit=50`)
 
-try:
-    # Scraper depuis TripAdvisor
-    restaurants = scraper.scrape_tripadvisor(location="Nantes", max_pages=2)
-    
-    # Sauvegarder les restaurants
-    for restaurant in restaurants:
-        scraper.save_restaurant(restaurant)
-    
-    # Afficher les statistiques
-    stats = scraper.get_statistics()
-    print(f"Total: {stats['total']} restaurants")
-    
-finally:
-    scraper.close()
-```
-
-Voir `example_usage.py` pour plus d'exemples.
-
-### Visualiser et Exporter les Données
-
-Utilisez le script `view_data.py` pour visualiser et exporter vos données :
-
+**Exemple:**
 ```bash
-python view_data.py
+curl https://votre-projet.railway.app/api/restaurants?cuisine=japanese&limit=10
 ```
 
-**Fonctionnalités** :
-- 📊 Statistiques détaillées (par cuisine, note moyenne, etc.)
-- 📋 Affichage des restaurants avec filtres
-- 💾 Export en CSV ou JSON
-- 🔍 Recherche par type de cuisine
+### GET `/api/restaurants/stats`
+Statistiques des restaurants
 
-## 📊 Base de données
+**Exemple:**
+```bash
+curl https://votre-projet.railway.app/api/restaurants/stats
+```
 
-Les restaurants sont stockés dans une base de données SQLite : `restaurants_scraped.db`
+### POST `/api/restaurants/fetch`
+Récupère de nouveaux restaurants depuis OpenStreetMap
 
-### Structure de la table
+**Body (JSON):**
+```json
+{
+  "cuisine": "italian"  // optionnel
+}
+```
 
+**Exemple:**
+```bash
+curl -X POST https://votre-projet.railway.app/api/restaurants/fetch \
+  -H "Content-Type: application/json" \
+  -d '{"cuisine": "japanese"}'
+```
+
+### GET `/api/restaurants/export/csv`
+Exporte les restaurants en CSV
+
+**Exemple:**
+```bash
+curl https://votre-projet.railway.app/api/restaurants/export/csv -o restaurants.csv
+```
+
+### GET `/`
+Interface web avec documentation de l'API
+
+## 💾 Base de données
+
+Le projet utilise **SQLite** intégré dans Bun. La base de données est créée automatiquement au premier démarrage.
+
+**Structure:**
 ```sql
 CREATE TABLE restaurants (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source TEXT,
-    name TEXT NOT NULL,
-    cuisine TEXT,
-    address TEXT,
-    phone TEXT,
-    rating REAL,
-    price_range TEXT,
-    url TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  cuisine TEXT,
+  address TEXT,
+  city TEXT DEFAULT 'Nantes',
+  latitude REAL,
+  longitude REAL,
+  osm_id TEXT,
+  osm_type TEXT,
+  website TEXT,
+  phone TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ```
 
-### Interroger la base de données
+## 🛠️ Développement local
 
-**Option 1 : Utiliser le script de visualisation** (recommandé)
+### Prérequis
 
-```bash
-python view_data.py
-```
+- [Bun](https://bun.sh) installé
 
-**Option 2 : Utiliser SQLite directement**
+### Installation
 
 ```bash
-sqlite3 restaurants_scraped.db
+# Cloner le projet
+git clone https://github.com/votre-username/cuisine-du-monde.git
+cd cuisine-du-monde
+
+# Installer Bun (si pas déjà fait)
+curl -fsSL https://bun.sh/install | bash
 ```
 
-Exemples de requêtes SQL :
+### Lancer le serveur
 
-```sql
--- Tous les restaurants
-SELECT * FROM restaurants;
-
--- Restaurants par source
-SELECT source, COUNT(*) FROM restaurants GROUP BY source;
-
--- Top 10 restaurants par note
-SELECT name, cuisine, rating FROM restaurants 
-ORDER BY rating DESC LIMIT 10;
-
--- Restaurants italiens avec note > 4.0
-SELECT name, address, rating FROM restaurants 
-WHERE cuisine = 'italian' AND rating > 4.0;
+```bash
+bun run src/server.ts
 ```
 
-## 🔧 Configuration
+Le serveur sera disponible sur `http://localhost:3000`
 
-### Modifier la localisation
+## 📊 Format CSV
 
-Dans `web_scraper.py`, modifiez la variable par défaut ou passez-la en paramètre :
+Le CSV exporté contient :
 
-```python
-scraper.scrape_tripadvisor(location="Paris")
-```
+- **nom** - Nom du restaurant
+- **typedecuisine** - Pays d'origine (Chine, Japon, Italie, etc.)
+- **adresse** - Adresse complète
+- **ville** - Nantes
+- **lien_google_maps** - Lien cliquable vers Google Maps
+- **phone** - Numéro de téléphone
 
-### Modifier les types de cuisines
+**Note :** Les restaurants français sont automatiquement exclus.
 
-```python
-cuisines = ["italian", "chinese", "indian", "japanese", "mexican", "thai"]
-scraper.scrape_all_sources(location="Nantes", cuisines=cuisines)
-```
+## 🔧 Configuration Railway
 
-### Ajuster les délais entre requêtes
+### Variables d'environnement
 
-Dans `web_scraper.py` :
+Railway détecte automatiquement le port via `process.env.PORT`. Aucune configuration supplémentaire n'est nécessaire.
 
-```python
-BASE_DELAY = 2.0  # Secondes entre les requêtes (augmentez pour être plus respectueux)
-```
+### Persistance des données
 
-## 📝 Limitations
+Par défaut, SQLite sauvegarde dans le système de fichiers. Pour une persistance permanente sur Railway, vous pouvez :
 
-- **Structure des sites** : Les sites web peuvent changer leur structure HTML, nécessitant des mises à jour des sélecteurs CSS
-- **Blocages potentiels** : Certains sites peuvent bloquer les scrapers (CAPTCHA, IP ban, etc.)
-- **JavaScript** : Les sites utilisant beaucoup de JavaScript peuvent nécessiter Selenium au lieu de BeautifulSoup
-- **Lenteur** : Le scraping web est plus lent qu'une API (délais entre requêtes)
+1. Utiliser Railway Volumes pour persister la base de données
+2. Migrer vers PostgreSQL (Railway propose une base PostgreSQL gratuite)
 
-## 🛠️ Développement
-
-### Structure du projet
+## 📝 Structure du projet
 
 ```
 cuisine_du_monde/
-├── web_scraper.py      # Script principal de scraping
-├── view_data.py         # Visualisation et export des données
-├── example_usage.py     # Exemples d'utilisation
-├── requirements.txt     # Dépendances Python
-├── README.md           # Documentation
-└── .gitignore          # Fichiers à ignorer par Git
+├── src/
+│   ├── server.ts      # Serveur HTTP avec Bun
+│   ├── fetcher.ts     # Classe pour récupérer depuis OSM
+│   └── index.ts       # Script CLI (optionnel)
+├── package.json       # Configuration Bun
+├── Procfile          # Configuration Railway
+├── railway.json      # Configuration Railway avancée
+└── nixpacks.toml     # Configuration build Railway
 ```
 
-### Ajouter une nouvelle source
+## 🎯 Fonctionnalités
 
-Pour ajouter une nouvelle source de scraping :
+- ✅ API REST complète
+- ✅ Interface web avec documentation
+- ✅ Base de données SQLite intégrée
+- ✅ Export CSV
+- ✅ Filtrage par cuisine
+- ✅ Statistiques
+- ✅ CORS activé
+- ✅ Déploiement Railway prêt
 
-1. Créez une nouvelle méthode dans `WebRestaurantScraper` :
-```python
-def scrape_nouvelle_source(self, location: str, **kwargs) -> List[Dict]:
-    # Votre code de scraping ici
-    pass
-```
+## 📄 Licence
 
-2. Ajoutez-la dans `scrape_all_sources()` si nécessaire
-
-3. Documentez la méthode avec les avertissements appropriés
-
-## 🤝 Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à :
-
-- 🐛 Signaler des bugs
-- 💡 Proposer des améliorations
-- ➕ Ajouter de nouvelles sources de données
-- 📝 Améliorer la documentation
-- 🧪 Ajouter des tests
-
-### Comment contribuer
-
-1. Fork le projet
-2. Créez une branche pour votre fonctionnalité (`git checkout -b feature/AmazingFeature`)
-3. Committez vos changements (`git commit -m 'Add some AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
-5. Ouvrez une Pull Request
-
-## ⚖️ Licence
-
-Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
-
-## 📞 Support
-
-Pour toute question ou problème :
-
-1. Vérifiez que toutes les dépendances sont installées
-2. Consultez les issues existantes sur GitHub
-3. Créez une nouvelle issue si nécessaire
-
-## 🎯 Roadmap
-
-- [ ] Ajouter plus de sources (Zomato, OpenTable, etc.)
-- [ ] Support pour Selenium pour les sites JavaScript
-- [ ] Interface web pour visualiser les données
-- [ ] API REST pour accéder aux données
-- [ ] Export vers d'autres formats (Excel, PostgreSQL, etc.)
-- [ ] Système de cache pour éviter les re-scraping
-- [ ] Tests automatisés
-
-## 🙏 Remerciements
-
-- BeautifulSoup pour le parsing HTML
-- Requests pour les requêtes HTTP
-- La communauté open-source Python
+MIT
 
 ---
 
-**Bon scraping ! 🍜🍕🍣**
-
-*Rappelez-vous : Utilisez ce projet de manière responsable et respectueuse.*
+**Bon déploiement ! 🚀**
