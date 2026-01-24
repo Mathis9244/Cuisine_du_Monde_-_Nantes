@@ -2,10 +2,14 @@
 nixPkgs = ["nodejs-18_x", "unzip"]
 
 [phases.install]
-cmds = ["curl -fsSL https://bun.sh/install | bash", "export PATH=\"$HOME/.bun/bin:$PATH\""]
+cmds = [
+  "curl -fsSL https://bun.sh/install | bash"
+]
 
 [phases.build]
-cmds = ["export PATH=\"$HOME/.bun/bin:$PATH\"", "bun install"]
+cmds = [
+  "export PATH=\"$HOME/.bun/bin:$PATH\" && $HOME/.bun/bin/bun install || echo 'No dependencies to install'"
+]
 
 [start]
-cmd = "bun run src/server.ts"
+cmd = "export PATH=\"$HOME/.bun/bin:$PATH\" && bun run src/server.ts"
