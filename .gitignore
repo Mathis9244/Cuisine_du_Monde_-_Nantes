@@ -1,42 +1,14 @@
 # Variables d'environnement
 .env
+.env.local
+.env.*.local
 
-# Bases de données SQLite (garder pour Railway)
-# *.db
-# *.sqlite
-# *.sqlite3
-
-# Python (ancien projet)
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Node.js / Bun
+# Node.js
 node_modules/
-bun.lockb
 *.log
 .next/
 out/
+dist/
 
 # IDE
 .vscode/
@@ -48,7 +20,3 @@ out/
 # OS
 .DS_Store
 Thumbs.db
-
-# Exports CSV/JSON (optionnel - décommenter si vous voulez les ignorer)
-# *.csv
-# *.json
