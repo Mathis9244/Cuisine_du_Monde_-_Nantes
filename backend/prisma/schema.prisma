@@ -1,0 +1,51 @@
+// Cuisine du Monde - Nantes - Schéma Prisma
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Restaurant {
+  id         Int       @id @default(autoincrement())
+  name       String
+  cuisine    String?
+  address    String?
+  city       String    @default("Nantes")
+  latitude   Float?
+  longitude  Float?
+  website    String?
+  phone      String?
+  source     String?   // osm, csv, manual
+  sourceId   String?   @map("source_id")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([cuisine])
+  @@index([isActive])
+  @@map("restaurants")
+}
+
+model AdminUser {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   @map("password_hash")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("admin_users")
+}
+
+model SyncLog {
+  id         Int      @id @default(autoincrement())
+  source     String   // osm, csv
+  count      Int      @default(0)
+  status     String   // success, error, partial
+  details    String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("sync_logs")
+}

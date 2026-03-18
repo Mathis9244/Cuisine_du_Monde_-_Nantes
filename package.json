@@ -1,14 +1,18 @@
 {
-  "name": "cuisine-du-monde",
-  "version": "1.0.0",
-  "description": "Récupération des restaurants à Nantes depuis OpenStreetMap avec Bun",
-  "type": "module",
+  "name": "cuisine-du-monde-nantes",
+  "version": "2.0.0",
+  "description": "Application web des restaurants du monde à Nantes - Next.js + NestJS + PostgreSQL",
+  "private": true,
   "scripts": {
-    "start": "bun run src/server.ts",
-    "dev": "bun run src/server.ts",
-    "fetch": "bun run src/index.ts"
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:build": "docker compose build",
+    "backend:dev": "cd backend && npm run start:dev",
+    "frontend:dev": "cd frontend && npm run dev",
+    "backend:build": "cd backend && npm run build",
+    "frontend:build": "cd frontend && npm run build"
   },
-  "keywords": ["osm", "openstreetmap", "restaurants", "nantes", "railway"],
-  "author": "",
+  "keywords": ["restaurants", "nantes", "nextjs", "nestjs", "postgresql", "docker"],
   "license": "MIT"
 }
