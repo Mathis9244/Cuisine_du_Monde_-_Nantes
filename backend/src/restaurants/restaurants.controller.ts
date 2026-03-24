@@ -30,8 +30,14 @@ export class RestaurantsController {
     return this.restaurantsService.findAll({
       cuisine,
       search,
-      hasWebsite: hasWebsite === 'true' ? true : hasWebsite === 'false' ? false : undefined,
-      hasPhone: hasPhone === 'true' ? true : hasPhone === 'false' ? false : undefined,
+      hasWebsite:
+        hasWebsite === 'true'
+          ? true
+          : hasWebsite === 'false'
+            ? false
+            : undefined,
+      hasPhone:
+        hasPhone === 'true' ? true : hasPhone === 'false' ? false : undefined,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
       sortBy: sortBy || 'name',
@@ -52,7 +58,7 @@ export class RestaurantsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Détail d\'un restaurant' })
+  @ApiOperation({ summary: "Détail d'un restaurant" })
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.restaurantsService.findOne(id);
   }

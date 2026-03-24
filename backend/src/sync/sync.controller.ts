@@ -15,4 +15,12 @@ export class SyncController {
   async syncFromOSM(@Body() body: { cuisine?: string }) {
     return this.syncService.syncFromOSM(body.cuisine);
   }
+
+  @Post('google')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Synchroniser depuis Google Maps via Selenium (admin)' })
+  async syncFromGoogle(@Body() body: { cuisine?: string }) {
+    return this.syncService.syncFromGoogle(body.cuisine);
+  }
 }

@@ -3,13 +3,13 @@ import Link from 'next/link';
 export default function AdminPage() {
   return (
     <div className="min-h-screen">
-      <header className="bg-white border-b border-stone-200 py-4">
+      <header className="app-header py-4">
         <div className="container flex justify-between items-center">
-          <Link href="/" className="text-xl font-bold text-stone-800">🍽️ Cuisine du Monde - Nantes</Link>
+          <Link href="/" className="brand-title text-xl font-bold">🍽️ Cuisine du Monde - Nantes</Link>
           <nav className="flex gap-4">
-            <Link href="/" className="text-stone-600 hover:text-orange-700">Accueil</Link>
-            <Link href="/catalogue" className="text-stone-600 hover:text-orange-700">Catalogue</Link>
-            <Link href="/admin" className="font-medium text-orange-700">Admin</Link>
+            <Link href="/" className="nav-link">Accueil</Link>
+            <Link href="/catalogue" className="nav-link">Catalogue</Link>
+            <Link href="/admin" className="nav-link-active">Admin</Link>
           </nav>
         </div>
       </header>
@@ -19,7 +19,7 @@ export default function AdminPage() {
 
         <div className="card p-6 max-w-md">
           <h2 className="font-semibold mb-4">Connexion administrateur</h2>
-          <p className="text-stone-600 mb-4">
+          <p className="text-[var(--color-muted)] mb-4">
             Connectez-vous pour accéder au tableau de bord, à la synchronisation OSM et à l&apos;export CSV.
           </p>
           <Link href="/admin/login" className="btn">
@@ -27,7 +27,7 @@ export default function AdminPage() {
           </Link>
         </div>
 
-        <p className="mt-6 text-sm text-stone-500">
+        <p className="mt-6 text-sm text-[var(--color-muted)]">
           Compte de démo : admin@cuisine-du-monde.local / admin123 (après seed)
         </p>
       </main>

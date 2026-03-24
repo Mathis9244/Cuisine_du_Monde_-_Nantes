@@ -22,4 +22,7 @@ async function bootstrap() {
   console.log(`🚀 API démarrée sur http://localhost:${port}`);
   console.log(`📚 Swagger: http://localhost:${port}/api/docs`);
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

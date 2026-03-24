@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { ColorblindToggle } from './ColorblindToggle';
 
 export const metadata: Metadata = {
   title: 'Cuisine du Monde - Nantes',
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body>{children}</body>
+      <body>
+        {children}
+        <ColorblindToggle />
+      </body>
     </html>
   );
 }

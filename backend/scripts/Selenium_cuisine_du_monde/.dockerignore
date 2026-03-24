@@ -1,0 +1,57 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+
+# Environnement virtuel
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Fichiers sensibles
+.env
+.env.local
+
+# Fichiers de test
+test_*.py
+check_*.py
+migrate_data.py
+
+# Documentation (optionnel - peut être gardé)
+# README.md
+# *.md
+
+# CSV exports (optionnel)
+# *.csv
+
+# Chrome/Selenium (sera installé dans le container)
+chromedriver
+geckodriver

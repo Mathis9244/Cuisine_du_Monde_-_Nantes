@@ -7,6 +7,10 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "db:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-db.ps1",
+    "db:setup:no-seed": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-db.ps1 -SkipSeed",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

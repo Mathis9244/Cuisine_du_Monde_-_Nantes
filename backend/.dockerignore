@@ -1,0 +1,19 @@
+node_modules
+dist
+coverage
+.next
+.git
+.vscode
+.idea
+Dockerfile
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+*.tsbuildinfo
+.env
+.env.*
+README.md
+
+# Prisma: on garde tout dans `prisma/` car nécessaire pour `prisma generate` et `migrate deploy`.
+

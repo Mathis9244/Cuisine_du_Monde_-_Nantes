@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Put,
   Patch,
   Body,
@@ -13,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import type { Response as ExpressResponse } from 'express';
+import { Prisma } from '@prisma/client';
 import { RestaurantsService } from '../restaurants/restaurants.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -36,7 +36,7 @@ export class AdminRestaurantsController {
     @Query('limit') limit?: string,
     @Query('includeInactive') includeInactive?: string,
   ) {
-    const where: any = {};
+    const where: Prisma.RestaurantWhereInput = {};
     if (cuisine) where.cuisine = { equals: cuisine, mode: 'insensitive' };
     if (search) {
       where.OR = [
@@ -49,42 +49,82 @@ export class AdminRestaurantsController {
     const [data, total] = await Promise.all([
       this.prisma.restaurant.findMany({
         where,
-        skip: ((parseInt(page || '1', 10) - 1) * parseInt(limit || '20', 10)),
+        skip: (parseInt(page || '1', 10) - 1) * parseInt(limit || '20', 10),
         take: parseInt(limit || '20', 10),
         orderBy: { name: 'asc' },
       }),
       this.prisma.restaurant.count({ where }),
     ]);
 
-    return { data, meta: { total, page: parseInt(page || '1', 10), limit: parseInt(limit || '20', 10) } };
+    return {
+      data,
+      meta: {
+        total,
+        page: parseInt(page || '1', 10),
+        limit: parseInt(limit || '20', 10),
+      },
+    };
   }
 
   @Get('export/csv')
   @ApiOperation({ summary: 'Export CSV (admin)' })
-  async exportCsv(@Res() res: ExpressResponse, @Query('excludeFrench') excludeFrench?: string): Promise<void> {
+  async exportCsv(
+    @Res() res: ExpressResponse,
+    @Query('excludeFrench') excludeFrench?: string,
+  ): Promise<void> {
     const restaurants = await this.prisma.restaurant.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
     });
 
     const cuisineToCountry: Record<string, string> = {
-      chinese: 'Chine', japanese: 'Japon', indian: 'Inde', thai: 'Thaïlande',
-      vietnamese: 'Vietnam', korean: 'Corée', lebanese: 'Liban', turkish: 'Turquie',
-      italian: 'Italie', french: 'France', spanish: 'Espagne', greek: 'Grèce',
-      mexican: 'Mexique', american: 'États-Unis', moroccan: 'Maroc',
-      mediterranean: 'Méditerranée', asian: 'Asie', seafood: 'Fruits de mer',
+      chinese: 'Chine',
+      japanese: 'Japon',
+      indian: 'Inde',
+      thai: 'Thaïlande',
+      vietnamese: 'Vietnam',
+      korean: 'Corée',
+      lebanese: 'Liban',
+      turkish: 'Turquie',
+      italian: 'Italie',
+      french: 'France',
+      spanish: 'Espagne',
+      greek: 'Grèce',
+      mexican: 'Mexique',
+      american: 'États-Unis',
+      moroccan: 'Maroc',
+      mediterranean: 'Méditerranée',
+      asian: 'Asie',
+      seafood: 'Fruits de mer',
     };
-    const frenchKeywords = ['french', 'français', 'française', 'bistrot', 'brasserie', 'bouchon', 'crepe', 'crêpe', 'galette'];
+    const frenchKeywords = [
+      'french',
+      'français',
+      'française',
+      'bistrot',
+      'brasserie',
+      'bouchon',
+      'crepe',
+      'crêpe',
+      'galette',
+    ];
 
-    const rows: string[][] = [['nom', 'typedecuisine', 'adresse', 'ville', 'lien_google_maps', 'phone']];
+    const rows: string[][] = [
+      ['nom', 'typedecuisine', 'adresse', 'ville', 'lien_google_maps', 'phone'],
+    ];
     for (const r of restaurants) {
       const cuisineLower = (r.cuisine || '').toLowerCase();
-      if (excludeFrench === 'true' && frenchKeywords.some((k) => cuisineLower.includes(k))) continue;
+      if (
+        excludeFrench === 'true' &&
+        frenchKeywords.some((k) => cuisineLower.includes(k))
+      )
+        continue;
       const country = cuisineToCountry[cuisineLower] || r.cuisine || '';
       if (excludeFrench === 'true' && !country) continue;
       const lat = r.latitude ? Number(r.latitude) : null;
       const lon = r.longitude ? Number(r.longitude) : null;
-      const googleMaps = lat && lon ? `https://www.google.com/maps?q=${lat},${lon}` : '';
+      const googleMaps =
+        lat && lon ? `https://www.google.com/maps?q=${lat},${lon}` : '';
       rows.push([
         r.name,
         country,
@@ -95,9 +135,16 @@ export class AdminRestaurantsController {
       ]);
     }
 
-    const csv = rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows
+      .map((row) =>
+        row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','),
+      )
+      .join('\n');
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="restaurants_nantes.csv"');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="restaurants_nantes.csv"',
+    );
     res.send(csv);
   }
 
@@ -114,6 +161,7 @@ export class AdminRestaurantsController {
     @Body()
     body: {
       name?: string;
+      rating?: number;
       cuisine?: string;
       address?: string;
       city?: string;

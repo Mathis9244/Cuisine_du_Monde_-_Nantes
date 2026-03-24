@@ -28,25 +28,29 @@ export function CatalogueFilters({ cuisines, initialCuisine, initialSearch }: Pr
 
   return (
     <form
-      className="flex flex-wrap gap-4 mb-6 p-4 bg-white rounded-lg shadow-sm"
+      className="flex flex-wrap gap-4 mb-6 p-4 card"
       onSubmit={(e) => {
         e.preventDefault();
-        const form = e.currentTarget;
-        const search = (form.querySelector('[name=search]') as HTMLInputElement)?.value || '';
-        updateFilters({ search });
+        const formData = new FormData(e.currentTarget);
+        const searchValue = formData.get('search');
+        updateFilters({ search: typeof searchValue === 'string' ? searchValue.trim() : '' });
       }}
     >
+      <label htmlFor="catalogue-search" className="sr-only">Rechercher un restaurant</label>
       <input
+        id="catalogue-search"
         type="text"
         name="search"
         placeholder="Rechercher par nom..."
         defaultValue={initialSearch}
-        className="px-3 py-2 border border-stone-300 rounded-md flex-1 min-w-[200px]"
+        className="input-base px-3 py-2 flex-1 min-w-[200px]"
       />
+      <label htmlFor="catalogue-cuisine" className="sr-only">Filtrer par cuisine</label>
       <select
+        id="catalogue-cuisine"
         value={initialCuisine}
         onChange={(e) => updateFilters({ cuisine: e.target.value })}
-        className="px-3 py-2 border border-stone-300 rounded-md"
+        className="input-base px-3 py-2"
       >
         <option value="">Toutes les cuisines</option>
         {cuisines.map((c) => (

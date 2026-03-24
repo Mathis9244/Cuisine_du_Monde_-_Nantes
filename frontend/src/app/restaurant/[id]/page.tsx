@@ -22,27 +22,32 @@ export default async function RestaurantPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="min-h-screen">
-      <header className="bg-white border-b border-stone-200 py-4">
+      <header className="app-header py-4">
         <div className="container flex justify-between items-center">
-          <Link href="/" className="text-xl font-bold text-stone-800">🍽️ Cuisine du Monde - Nantes</Link>
+          <Link href="/" className="brand-title text-xl font-bold">🍽️ Cuisine du Monde - Nantes</Link>
           <nav className="flex gap-4">
-            <Link href="/" className="text-stone-600 hover:text-orange-700">Accueil</Link>
-            <Link href="/catalogue" className="text-stone-600 hover:text-orange-700">Catalogue</Link>
-            <Link href="/admin" className="text-stone-600 hover:text-orange-700">Admin</Link>
+            <Link href="/" className="nav-link">Accueil</Link>
+            <Link href="/catalogue" className="nav-link">Catalogue</Link>
+            <Link href="/admin" className="nav-link">Admin</Link>
           </nav>
         </div>
       </header>
 
       <main className="container py-8">
-        <Link href="/catalogue" className="text-orange-600 hover:underline mb-4 inline-block">
+        <Link href="/catalogue" className="text-[var(--color-primary)] hover:underline mb-4 inline-block">
           ← Retour au catalogue
         </Link>
 
         <div className="card max-w-2xl overflow-hidden">
           <div className="p-6">
             <h1 className="text-2xl font-bold mb-2">{restaurant.name}</h1>
+            {typeof restaurant.rating === 'number' && (
+              <p className="text-sm text-[var(--color-primary)] mb-2">
+                Note: {restaurant.rating.toFixed(1)} / 5
+              </p>
+            )}
             {restaurant.cuisine && (
-              <span className="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm mb-4">
+              <span className="inline-block px-3 py-1 bg-[var(--color-surface-soft)] text-white rounded-full text-sm mb-4">
                 {restaurant.cuisine}
               </span>
             )}
@@ -50,17 +55,17 @@ export default async function RestaurantPage({ params }: { params: Promise<{ id:
             <dl className="space-y-3">
               {restaurant.address && (
                 <>
-                  <dt className="font-medium text-stone-500">Adresse</dt>
+                  <dt className="font-medium text-[var(--color-muted)]">Adresse</dt>
                   <dd>{restaurant.address}</dd>
                 </>
               )}
-              <dt className="font-medium text-stone-500">Ville</dt>
+              <dt className="font-medium text-[var(--color-muted)]">Ville</dt>
               <dd>{restaurant.city}</dd>
               {restaurant.phone && (
                 <>
-                  <dt className="font-medium text-stone-500">Téléphone</dt>
+                  <dt className="font-medium text-[var(--color-muted)]">Téléphone</dt>
                   <dd>
-                    <a href={`tel:${restaurant.phone}`} className="text-orange-600">
+                    <a href={`tel:${restaurant.phone}`} className="text-[var(--color-primary)]">
                       {restaurant.phone}
                     </a>
                   </dd>
@@ -68,9 +73,9 @@ export default async function RestaurantPage({ params }: { params: Promise<{ id:
               )}
               {restaurant.website && (
                 <>
-                  <dt className="font-medium text-stone-500">Site web</dt>
+                  <dt className="font-medium text-[var(--color-muted)]">Site web</dt>
                   <dd>
-                    <a href={restaurant.website} target="_blank" rel="noopener noreferrer" className="text-orange-600">
+                    <a href={restaurant.website} target="_blank" rel="noopener noreferrer" className="text-[var(--color-primary)]">
                       {restaurant.website}
                     </a>
                   </dd>

@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.2",
@@ -18,9 +18,13 @@
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "typescript": "^5"
+    "eslint": "^10.1.0",
+    "globals": "^17.4.0",
+    "typescript": "^5",
+    "typescript-eslint": "^8.57.1"
   }
 }

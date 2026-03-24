@@ -15,6 +15,14 @@ interface OverpassResponse {
   elements: OSMElement[];
 }
 
+function isOverpassResponse(value: unknown): value is OverpassResponse {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as { elements?: unknown }).elements)
+  );
+}
+
 export interface OSMRestaurant {
   name: string;
   cuisine?: string;
@@ -36,7 +44,9 @@ export class OSMFetcherService {
   ];
   private currentUrlIndex = 0;
 
-  async fetchRestaurantsNantes(cuisineFilter?: string): Promise<OSMRestaurant[]> {
+  async fetchRestaurantsNantes(
+    cuisineFilter?: string,
+  ): Promise<OSMRestaurant[]> {
     const query = cuisineFilter
       ? `
         [out:json][timeout:15];
@@ -64,17 +74,25 @@ export class OSMFetcherService {
           body: query,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data: OverpassResponse = await response.json();
+        const raw: unknown = await response.json();
+        if (!isOverpassResponse(raw)) {
+          throw new Error('Invalid Overpass response');
+        }
+        const data = raw;
         const restaurants: OSMRestaurant[] = [];
         for (const el of data.elements || []) {
-          if ((el.type === 'node' || el.type === 'way') && el.tags?.amenity === 'restaurant') {
+          if (
+            (el.type === 'node' || el.type === 'way') &&
+            el.tags?.amenity === 'restaurant'
+          ) {
             const r = this.parseElement(el);
             if (r?.name) restaurants.push(r);
           }
         }
         return restaurants;
       } catch {
-        this.currentUrlIndex = (this.currentUrlIndex + 1) % this.overpassUrls.length;
+        this.currentUrlIndex =
+          (this.currentUrlIndex + 1) % this.overpassUrls.length;
       }
     }
     return [];
@@ -111,17 +129,69 @@ export class OSMFetcherService {
     if (!cuisine) return undefined;
     const lower = cuisine.toLowerCase().trim().split(';')[0].trim();
     const map: Record<string, string> = {
-      italien: 'italian', italienne: 'italian', français: 'french', française: 'french',
-      japonais: 'japanese', japonaise: 'japanese', chinois: 'chinese', chinoise: 'chinese',
-      indien: 'indian', indienne: 'indian', mexicain: 'mexican', mexicaine: 'mexican',
-      thaï: 'thai', thaïlandais: 'thai', thaïlandaise: 'thai', libanais: 'lebanese',
-      libanaise: 'lebanese', espagnol: 'spanish', espagnole: 'spanish', grec: 'greek',
-      grecque: 'greek', turc: 'turkish', turque: 'turkish', marocain: 'moroccan',
-      marocaine: 'moroccan', vietnamien: 'vietnamese', vietnamienne: 'vietnamese',
-      coréen: 'korean', coréenne: 'korean', américain: 'american', américaine: 'american',
-      méditerranéen: 'mediterranean', méditerranéenne: 'mediterranean', asiatique: 'asian',
-      fruits_de_mer: 'seafood', poisson: 'seafood',
+      italien: 'italian',
+      italienne: 'italian',
+      français: 'french',
+      française: 'french',
+      japonais: 'japanese',
+      japonaise: 'japanese',
+      chinois: 'chinese',
+      chinoise: 'chinese',
+      indien: 'indian',
+      indienne: 'indian',
+      mexicain: 'mexican',
+      mexicaine: 'mexican',
+      thaï: 'thai',
+      thaïlandais: 'thai',
+      thaïlandaise: 'thai',
+      libanais: 'lebanese',
+      libanaise: 'lebanese',
+      espagnol: 'spanish',
+      espagnole: 'spanish',
+      grec: 'greek',
+      grecque: 'greek',
+      turc: 'turkish',
+      turque: 'turkish',
+      marocain: 'moroccan',
+      marocaine: 'moroccan',
+      vietnamien: 'vietnamese',
+      vietnamienne: 'vietnamese',
+      coréen: 'korean',
+      coréenne: 'korean',
+      américain: 'american',
+      américaine: 'american',
+      méditerranéen: 'mediterranean',
+      méditerranéenne: 'mediterranean',
+      asiatique: 'asian',
+      fruits_de_mer: 'seafood',
+      poisson: 'seafood',
     };
-    return map[lower] || (['italian','french','japanese','chinese','indian','mexican','thai','lebanese','spanish','greek','turkish','moroccan','vietnamese','korean','american','mediterranean','asian','seafood'].includes(lower) ? lower : (lower.length < 30 ? lower : undefined));
+    return (
+      map[lower] ||
+      ([
+        'italian',
+        'french',
+        'japanese',
+        'chinese',
+        'indian',
+        'mexican',
+        'thai',
+        'lebanese',
+        'spanish',
+        'greek',
+        'turkish',
+        'moroccan',
+        'vietnamese',
+        'korean',
+        'american',
+        'mediterranean',
+        'asian',
+        'seafood',
+      ].includes(lower)
+        ? lower
+        : lower.length < 30
+          ? lower
+          : undefined)
+    );
   }
 }

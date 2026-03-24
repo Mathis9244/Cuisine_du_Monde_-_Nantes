@@ -1,3 +1,5 @@
+name: cuisine_du_monde_nantes
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -8,9 +10,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cuisine"]
+      test: ["CMD-SHELL", "pg_isready -U cuisine -d cuisine_du_monde"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -34,7 +36,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3002:3000"
     environment:
       BACKEND_URL: http://backend:3001
     depends_on:

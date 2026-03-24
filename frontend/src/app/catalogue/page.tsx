@@ -32,13 +32,13 @@ export default async function CataloguePage({ searchParams }: PageProps) {
 
   return (
     <div className="min-h-screen">
-      <header className="bg-white border-b border-stone-200 py-4">
+      <header className="app-header py-4">
         <div className="container flex justify-between items-center">
-          <Link href="/" className="text-xl font-bold text-stone-800">🍽️ Cuisine du Monde - Nantes</Link>
+          <Link href="/" className="brand-title text-xl font-bold">🍽️ Cuisine du Monde - Nantes</Link>
           <nav className="flex gap-4">
-            <Link href="/" className="text-stone-600 hover:text-orange-700">Accueil</Link>
-            <Link href="/catalogue" className="font-medium text-orange-700">Catalogue</Link>
-            <Link href="/admin" className="text-stone-600 hover:text-orange-700">Admin</Link>
+            <Link href="/" className="nav-link">Accueil</Link>
+            <Link href="/catalogue" className="nav-link-active">Catalogue</Link>
+            <Link href="/admin" className="nav-link">Admin</Link>
           </nav>
         </div>
       </header>
@@ -46,13 +46,13 @@ export default async function CataloguePage({ searchParams }: PageProps) {
       <main className="container py-8">
         <h1 className="text-2xl font-bold mb-6">Catalogue des restaurants</h1>
 
-        <Suspense fallback={<div className="h-12 bg-stone-100 rounded animate-pulse" />}>
+        <Suspense fallback={<div className="h-12 bg-[var(--color-surface-soft)] rounded animate-pulse" />}>
           <CatalogueFilters cuisines={cuisines} initialCuisine={cuisine} initialSearch={search} />
         </Suspense>
 
         {data ? (
           <>
-            <p className="text-stone-600 mb-4">
+            <p className="text-[var(--color-muted)] mb-4">
               {data.meta.total} restaurant{data.meta.total > 1 ? 's' : ''} trouvé{data.meta.total > 1 ? 's' : ''}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -61,11 +61,11 @@ export default async function CataloguePage({ searchParams }: PageProps) {
                   <div className="p-5">
                     <h2 className="font-semibold text-lg mb-1">{r.name}</h2>
                     {r.cuisine && (
-                      <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-800 rounded text-sm mb-2">
+                      <span className="inline-block px-2 py-0.5 bg-[var(--color-surface-soft)] text-white rounded text-sm mb-2">
                         {r.cuisine}
                       </span>
                     )}
-                    {r.address && <p className="text-sm text-stone-600 truncate">{r.address}</p>}
+                    {r.address && <p className="text-sm text-[var(--color-muted)] truncate">{r.address}</p>}
                   </div>
                 </Link>
               ))}
@@ -96,7 +96,7 @@ export default async function CataloguePage({ searchParams }: PageProps) {
             )}
           </>
         ) : (
-          <p className="text-stone-600">Aucun restaurant disponible. Vérifiez que l&apos;API est démarrée.</p>
+          <p className="text-[var(--color-muted)]">Aucun restaurant disponible. Vérifiez que l&apos;API est démarrée.</p>
         )}
       </main>
     </div>

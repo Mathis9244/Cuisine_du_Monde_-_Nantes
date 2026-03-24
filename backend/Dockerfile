@@ -15,10 +15,13 @@ RUN npm run build
 FROM node:20-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package*.json ./
-COPY prisma ./prisma/
-RUN npm ci --omit=dev
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+# Reuse node_modules from the build stage to avoid a second npm install
+# (more reliable in constrained network environments during docker build).
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package*.json ./
+RUN npm prune --omit=dev
+COPY --from=build /app/prisma ./prisma/
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/dist ./dist
 EXPOSE 3001
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
