@@ -23,6 +23,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://cuisine:cuisine@postgres:5432/cuisine_du_monde
       JWT_SECRET: changez-moi-en-production-minimum-32-caracteres

@@ -23,5 +23,6 @@ RUN npm prune --omit=dev
 COPY --from=build /app/prisma ./prisma/
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/src/modules/bootstrap/seed-data.json ./dist/src/modules/bootstrap/seed-data.json
 EXPOSE 3001
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]

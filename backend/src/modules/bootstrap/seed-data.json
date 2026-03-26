@@ -1,0 +1,17 @@
+[
+  {
+    "source_id": "bootstrap:demo-1",
+    "name": "Demo Restaurant 1",
+    "city": "Nantes",
+    "cuisine": "italian",
+    "rating": 4.6
+  },
+  {
+    "source_id": "bootstrap:demo-2",
+    "name": "Demo Restaurant 2",
+    "city": "Nantes",
+    "cuisine": "japanese",
+    "rating": 4.4
+  }
+]
+

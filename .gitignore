@@ -17,6 +17,12 @@ dist/
 *.swo
 *~
 
+# Cursor
+.cursor/
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Old frontend backup (Next.js)
+frontend_next_backup/

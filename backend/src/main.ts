@@ -15,12 +15,21 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: { persistAuthorization: true },
+    customSiteTitle: 'Cuisine du Monde - Nantes API Docs',
+  });
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
-  console.log(`🚀 API démarrée sur http://localhost:${port}`);
-  console.log(`📚 Swagger: http://localhost:${port}/api/docs`);
+  const host = process.env.HOST || '0.0.0.0';
+  await app.listen(port, host);
+
+  const publicBaseUrl =
+    process.env.PUBLIC_BASE_URL ||
+    (host === '0.0.0.0' ? `http://<ton-ip>:${port}` : `http://${host}:${port}`);
+
+  console.log(`🚀 API démarrée sur ${publicBaseUrl}`);
+  console.log(`📚 Swagger: ${publicBaseUrl}/docs`);
 }
 bootstrap().catch((err) => {
   console.error(err);
