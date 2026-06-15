@@ -14,7 +14,10 @@ import { getValidatedEnv } from './config/env.schema';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: () => getValidatedEnv(),
+      // @nestjs/config passes the parsed .env file as `config` BEFORE it is
+      // injected into process.env. Merge both so validation works whether the
+      // vars come from a local .env file or from real env vars (Docker).
+      validate: (config) => getValidatedEnv({ ...process.env, ...config }),
     }),
     PrismaModule,
     RestaurantsModule,
