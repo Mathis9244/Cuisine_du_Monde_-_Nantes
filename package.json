@@ -1,18 +1,22 @@
 {
   "name": "cuisine-du-monde-nantes",
-  "version": "2.0.0",
-  "description": "Application web des restaurants du monde à Nantes - Next.js + NestJS + PostgreSQL",
+  "version": "3.0.0",
+  "description": "Application des restaurants du monde à Nantes - Next.js (full-stack) + Supabase, scraper Python autonome",
   "private": true,
   "scripts": {
-    "docker:up": "docker compose up -d",
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix web run start",
+    "lint": "npm --prefix web run lint",
+    "test": "npm --prefix web run test && python -m pytest scraper/tests -q",
+    "test:web": "npm --prefix web run test",
+    "test:scraper": "python -m pytest scraper/tests -q",
+    "install:web": "npm --prefix web install",
+    "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "docker:build": "docker compose build",
-    "backend:dev": "cd backend && npm run start:dev",
-    "frontend:dev": "cd frontend && npm run dev",
-    "backend:build": "cd backend && npm run build",
-    "frontend:build": "cd frontend && npm run build"
+    "scrape:osm": "python scraper/sync.py --source osm"
   },
-  "keywords": ["restaurants", "nantes", "nextjs", "nestjs", "postgresql", "docker"],
+  "keywords": ["restaurants", "nantes", "nextjs", "supabase"],
   "license": "MIT"
 }

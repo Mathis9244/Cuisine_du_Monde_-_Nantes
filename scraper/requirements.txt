@@ -1,0 +1,8 @@
+# Worker de synchronisation des restaurants -> Supabase
+requests>=2.31
+
+# Scraper Google Maps (Selenium). Inutile si vous n'utilisez que --source osm.
+selenium>=4.20
+webdriver-manager>=4.0
+# Importé par Cuisine.py (au chargement du module).
+psycopg2-binary>=2.9

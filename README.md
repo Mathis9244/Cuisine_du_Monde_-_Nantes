@@ -1,84 +1,89 @@
 # 🍽️ Cuisine du Monde - Nantes
 
-Application web de consultation et d'administration des restaurants du monde à Nantes. Refonte full-stack selon le cahier des charges : **Next.js** + **NestJS** + **PostgreSQL** + **Docker Compose**.
+Application web de consultation et d'administration des restaurants du monde à
+Nantes. Architecture refondue en **Next.js full-stack** (front + API dans la même
+app) connecté à **Supabase** (base de données + authentification), avec un
+**scraper Python autonome** séparé.
 
-## 🚀 Démarrage rapide (Docker)
+## 🏗️ Architecture
 
-**Prérequis :** Docker et Docker Compose installés.
+```
+├── web/        # App Next.js (App Router) : front + Route Handlers (API) -> Supabase
+└── scraper/    # Worker Python autonome : OSM + Google Maps -> écrit dans Supabase
+```
+
+- **Front + Backend** : une seule app Next.js. Le « backend » correspond aux
+  Route Handlers sous `web/app/api/**` qui parlent à Supabase.
+- **Auth** : Supabase (utilisateurs et admin). Le rôle admin est porté par le JWT
+  (`role: "admin"` dans `app_metadata`/`user_metadata`).
+- **Données** : table `restaurants` dans Supabase.
+- **Scraper** : worker indépendant qui écrit **directement** dans Supabase, sans
+  jamais passer par l'app web.
+
+## 🚀 Démarrage
+
+### 1. Configurer Supabase
+
+1. Créez un projet sur [supabase.com](https://supabase.com).
+2. Dans l'éditeur SQL, exécutez `web/supabase/schema.sql`.
+3. Récupérez : `Project URL`, `anon key`, `service_role key`.
+
+### 2. Lancer l'app web (dev)
 
 ```bash
-# Cloner et lancer
-git clone <repo>
-cd Cuisine_du_Monde_-_Nantes
-
-# Démarrer tous les services
-docker compose up -d
-
-# Appliquer les migrations et créer l'admin (première fois)
-docker compose exec backend npx prisma migrate deploy
-docker compose exec backend npx prisma db seed
-```
-
-- **Frontend :** http://localhost:3000  
-- **API / Swagger :** http://localhost:3001/docs  
-- **Compte admin :** admin@cuisine-du-monde.local / admin123  
-
-## 📁 Structure du projet
-
-```
-├── frontend/          # Next.js - Interface publique + back-office
-├── backend/           # NestJS - API REST, auth, sync OSM
-├── docker-compose.yml
-└── README.md
-```
-
-## 🛠️ Développement local (sans Docker)
-
-> **Windows PowerShell :** `&&` n'est pas supporté. Exécutez les commandes une par une, ou utilisez `npm run backend:dev` et `npm run frontend:dev` depuis la racine.
-
-### Backend
-
-```bash
-cd backend
+cd web
 npm install
-cp .env.example .env   # ou copy sur Windows
-# Configurer DATABASE_URL (PostgreSQL local)
-npx prisma migrate dev
-npx prisma db seed
-npm run start:dev
-```
-
-API : http://localhost:3001 | Swagger : http://localhost:3001/docs
-
-### Frontend (dans un autre terminal)
-
-```bash
-cd frontend
-npm install
+copy .env.example .env.local   # (cp sur macOS/Linux), puis renseigner les clés Supabase
 npm run dev
 ```
 
-Frontend : http://localhost:3000
+- App : http://localhost:3000
+- Back-office admin : http://localhost:3000/admin
 
-## 📡 API
+> **Compte admin** : créez un compte via l'app, puis promouvez-le en admin
+> (voir instructions en bas de `web/supabase/schema.sql`).
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| GET | /api/v1/restaurants | Liste avec filtres (cuisine, search, pagination) |
-| GET | /api/v1/restaurants/stats | Statistiques |
-| GET | /api/v1/restaurants/cuisines | Types de cuisines |
-| GET | /api/v1/restaurants/:id | Détail restaurant |
-| POST | /api/v1/auth/login | Connexion admin |
-| POST | /api/v1/sync/osm | Sync OpenStreetMap (admin) |
-| GET | /api/v1/admin/restaurants/export/csv | Export CSV (admin) |
+### 3. Alimenter la base (scraper)
 
-Documentation complète : http://localhost:3001/docs
+```bash
+cd scraper
+pip install -r requirements.txt
+copy .env.example .env          # renseigner SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+python sync.py --source osm     # import OpenStreetMap
+python sync.py --source google --limit 5 --headless   # import Google Maps (Selenium)
+```
+
+## 🐳 Docker
+
+```bash
+# Renseigner les variables d'env (NEXT_PUBLIC_SUPABASE_URL, etc.) dans un .env à la racine
+docker compose up -d --build
+```
+
+App disponible sur http://localhost:3000.
+
+## 📡 API (Route Handlers)
+
+| Méthode | Endpoint | Auth | Description |
+|---------|----------|------|-------------|
+| GET | `/api/restaurants` | – | Liste + filtres (cuisine, search, pagination, tri) |
+| GET | `/api/restaurants/stats` | – | Statistiques (total, par cuisine) |
+| GET | `/api/restaurants/cuisines` | – | Types de cuisines |
+| GET | `/api/restaurants/:id` | – | Détail d'un restaurant actif |
+| GET | `/api/auth/me` | session | Utilisateur courant (+ isAdmin) |
+| GET | `/api/admin/restaurants` | admin | Liste admin (inclut inactifs) |
+| POST | `/api/admin/restaurants` | admin | Créer un restaurant |
+| GET/PUT | `/api/admin/restaurants/:id` | admin | Détail / modification |
+| PATCH | `/api/admin/restaurants/:id/activate` | admin | Réactiver |
+| PATCH | `/api/admin/restaurants/:id/deactivate` | admin | Désactiver |
+| GET | `/api/admin/restaurants/export/csv` | admin | Export CSV |
+| POST | `/api/ai` | – | Assistant culinaire (Gemini, clé côté serveur) |
 
 ## 🔐 Sécurité
 
-- Authentification admin : JWT
-- Mots de passe hashés (bcrypt)
-- Variables sensibles dans `.env` (ne pas committer)
+- Auth via Supabase (JWT). RLS activée : lecture publique des restaurants actifs.
+- Les écritures admin utilisent la clé `service_role` **côté serveur uniquement**.
+- Clé Gemini jamais exposée au navigateur (appel via `/api/ai`).
 
 ## 📄 Licence
 

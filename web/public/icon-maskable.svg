@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Cuisine du Monde">
+  <rect width="512" height="512" fill="#081c1b"/>
+  <circle cx="256" cy="256" r="118" fill="none" stroke="#ff9f1c" stroke-width="24"/>
+  <circle cx="256" cy="256" r="64" fill="#2ec4b6"/>
+  <line x1="138" y1="256" x2="374" y2="256" stroke="#cbf3f0" stroke-width="8" opacity="0.5"/>
+</svg>
