@@ -1,6 +1,5 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import nextPwa from "next-pwa";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,12 +17,4 @@ const nextConfig = {
   },
 };
 
-const withPwa = nextPwa({
-  dest: "public",
-  register: true,
-  skipWaiting: true,
-  // On désactive le SW en dev pour éviter les caches trompeurs.
-  disable: process.env.NODE_ENV === "development",
-});
-
-export default withPwa(nextConfig);
+export default nextConfig;
