@@ -5,8 +5,8 @@
   "description": "Circle : application full-stack Next.js (front + API) connectée à Supabase",
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "node scripts/generate-pwa-icons.mjs && next build",
-    "start": "next start -p 3000",
+    "build": "node scripts/generate-pwa-icons.mjs && next build && node scripts/copy-public-to-standalone.mjs",
+    "start": "node .next/standalone/server.js",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -14,7 +14,6 @@
     "icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
-    "@google/genai": "^1.46.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.100.0",
     "framer-motion": "^12.26.2",

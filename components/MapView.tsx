@@ -10,6 +10,7 @@ import "leaflet.markercluster";
 import type { Restaurant } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 
+// Icône Leaflet par défaut (chemins cassés sous bundlers).
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconRetinaUrl:
