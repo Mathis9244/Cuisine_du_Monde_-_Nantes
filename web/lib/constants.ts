@@ -1,3 +1,5 @@
+export const APP_NAME = "Circle";
+
 export const APP_COLORS = {
   primary: "#ff9f1c",
   secondary: "#2ec4b6",

@@ -72,7 +72,7 @@ body {
   margin: 0;
   position: relative;
   z-index: 10;
-  color: #ffffff;
+  color: rgb(var(--c-text));
 }
 .gooey-nav-container nav ul li {
   border-radius: 100vw;
@@ -87,7 +87,7 @@ body {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: white !important;
+  color: rgb(var(--c-text)) !important;
   white-space: nowrap;
 }
 
@@ -101,8 +101,14 @@ body {
 .gooey-nav-container nav ul li.active {
   opacity: 1;
 }
+.gooey-nav-container nav ul li.active a {
+  color: transparent !important;
+}
 .gooey-nav-container nav ul li:not(.active) {
-  opacity: 0.4;
+  opacity: 0.45;
+}
+[data-theme="light"] .gooey-nav-container nav ul li:not(.active) {
+  opacity: 0.72;
 }
 
 .gooey-nav-container .effect {
@@ -117,7 +123,7 @@ body {
   z-index: 1;
 }
 .gooey-nav-container .effect.text {
-  color: white;
+  color: #ffffff;
   font-weight: 800;
   font-size: 0.75rem;
   text-transform: uppercase;

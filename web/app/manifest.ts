@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
+import { APP_NAME } from "@/lib/constants";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Cuisine du Monde - Nantes",
-    short_name: "Cuisine Monde",
+    name: APP_NAME,
+    short_name: APP_NAME,
     description:
       "Découvrez et notez les restaurants du monde à Nantes. Roulette des cuisines, carte interactive et recommandations.",
     start_url: "/",

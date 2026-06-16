@@ -2,7 +2,7 @@
   "name": "cuisine-du-monde-web",
   "version": "1.0.0",
   "private": true,
-  "description": "Cuisine du Monde - Nantes : application full-stack Next.js (front + API) connectée à Supabase",
+  "description": "Circle : application full-stack Next.js (front + API) connectée à Supabase",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "node scripts/generate-pwa-icons.mjs && next build",

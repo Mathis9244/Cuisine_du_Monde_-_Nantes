@@ -5,6 +5,8 @@ import { ThemeProvider, themeNoFlashScript } from "@/lib/theme";
 import { I18nProvider } from "@/lib/i18n";
 import PWARegister from "@/components/PWARegister";
 
+import { APP_NAME } from "@/lib/constants";
+
 const inter = Inter({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800", "900"],
@@ -12,10 +14,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Cuisine du Monde - Nantes",
+  title: APP_NAME,
   description:
     "Découvrez et notez les restaurants du monde à Nantes. Le cercle des explorateurs culinaires.",
-  applicationName: "Cuisine du Monde - Nantes",
+  applicationName: APP_NAME,
   manifest: "/manifest.webmanifest",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   alternates: {
@@ -38,12 +40,12 @@ export const metadata: Metadata = {
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
   },
   openGraph: {
-    title: "Cuisine du Monde - Nantes",
+    title: APP_NAME,
     description:
       "Découvrez et notez les restaurants du monde à Nantes. Le cercle des explorateurs culinaires.",
     type: "website",
     url: "/",
-    siteName: "Cuisine du Monde - Nantes",
+    siteName: APP_NAME,
   },
 };
 

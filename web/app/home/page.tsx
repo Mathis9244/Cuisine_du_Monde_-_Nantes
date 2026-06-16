@@ -9,6 +9,7 @@ import { cuisineToCountry } from "@/lib/mappers";
 import WheelOfFortune from "@/components/WheelOfFortune";
 import ThemeToggle from "@/components/ThemeToggle";
 import LanguageToggle from "@/components/LanguageToggle";
+import { APP_NAME } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 
 function WheelSkeleton() {
@@ -56,7 +57,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-circle-bg text-circle-text font-sans">
       <nav className="sticky top-0 z-50 bg-circle-bg/80 backdrop-blur-2xl border-b border-circle-border px-4 md:px-8 h-20 flex items-center justify-between">
         <span className="font-black text-base md:text-lg uppercase tracking-widest text-circle-amber">
-          Circle
+          {APP_NAME}
         </span>
         <div className="flex items-center gap-2 md:gap-4">
           <LanguageToggle />
@@ -73,7 +74,7 @@ export default function HomePage() {
       <main className="container mx-auto max-w-3xl px-4 md:px-8 py-12 md:py-20 space-y-12">
         <header className="text-center space-y-4">
           <h1 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-none">
-            Cuisine du Monde
+            {APP_NAME}
           </h1>
           <p className="text-circle-frost/50 font-black uppercase tracking-[0.4em] text-[10px] md:text-xs">
             {t("home.subtitle")}

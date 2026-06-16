@@ -1,6 +1,6 @@
 {
-  "name": "Cuisine du Monde - Nantes",
-  "short_name": "Cuisine Nantes",
+  "name": "Circle",
+  "short_name": "Circle",
   "description": "Découvrez et notez les restaurants du monde à Nantes.",
   "start_url": "/home",
   "scope": "/",

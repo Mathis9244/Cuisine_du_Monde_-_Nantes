@@ -7,6 +7,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { Restaurant, FriendRating } from "@/lib/types";
 import { fetchCuisines, fetchRestaurants } from "@/lib/api";
+import { APP_NAME } from "@/lib/constants";
 import { countryToCuisine, cuisineToCountry } from "@/lib/mappers";
 import {
   getSupabaseBrowserClient,
@@ -401,7 +402,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
         >
           <div className="text-center mb-12">
             <h1 className="text-5xl font-black text-circle-text tracking-tighter mb-4 uppercase">
-              Circle
+              {APP_NAME}
             </h1>
             <p className="text-circle-frost/40 text-sm font-black uppercase tracking-[0.3em]">
               {t("auth.tagline")}
@@ -479,7 +480,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
           {isAtHome ? (
             <div className="cursor-pointer" onClick={() => handleNav(0)}>
               <span className="font-black text-base md:text-lg uppercase tracking-widest text-circle-amber">
-                Circle
+                {APP_NAME}
               </span>
             </div>
           ) : (
@@ -685,7 +686,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
       <footer className="py-24 border-t border-circle-border text-center opacity-20 hover:opacity-100 transition-opacity">
         <p className="text-[10px] font-black uppercase tracking-[0.6em]">
-          Nantes World Eats Collective
+          {APP_NAME}
         </p>
       </footer>
 
