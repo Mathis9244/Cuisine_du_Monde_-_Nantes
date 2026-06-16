@@ -2,7 +2,16 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, LogOut, ArrowLeft, Shield, X, LogIn } from "lucide-react";
+import {
+  Search,
+  LogOut,
+  ArrowLeft,
+  Shield,
+  X,
+  LogIn,
+  Menu,
+  SlidersHorizontal,
+} from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { Restaurant, FriendRating } from "@/lib/types";
@@ -44,6 +53,7 @@ const MapView = dynamic(() => import("./MapView"), {
 const MDiv = motion.div as any;
 
 type ViewMode = "feed" | "spin" | "map" | "profile" | "ai";
+type FeedFilter = "all" | "top" | "reviews" | "website";
 
 interface SessionUser {
   id: string;
@@ -90,6 +100,8 @@ const CircleApp: React.FC = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
 
   // Débounce léger pour une recherche fluide (évite le lag au clavier).
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -338,8 +350,20 @@ const CircleApp: React.FC = () => {
     ? wheelCountries
     : Array.from(new Set(restaurants.map((r) => r.country))).sort();
 
-  // La recherche + filtre cuisine sont appliqués côté API (pagination).
-  const filteredRestaurants = useMemo(() => restaurants, [restaurants]);
+  const filteredRestaurants = useMemo(() => {
+    return restaurants.filter((restaurant) => {
+      if (feedFilter === "top") {
+        return (restaurant.rating ?? 0) >= 4.2;
+      }
+      if (feedFilter === "reviews") {
+        return (restaurant.friendRatings?.length ?? 0) > 0;
+      }
+      if (feedFilter === "website") {
+        return Boolean(restaurant.website);
+      }
+      return true;
+    });
+  }, [feedFilter, restaurants]);
 
   const requireAuth = useCallback((action: () => void) => {
     if (!user) {
@@ -488,6 +512,25 @@ const CircleApp: React.FC = () => {
 
   const isAtHome = currentView === "feed" && !viewAllCountry;
 
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileNavOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileNavOpen]);
+
   if (!isSupabaseConfigured()) {
     return (
       <div className="min-h-screen bg-circle-bg flex items-center justify-center p-6 font-sans">
@@ -511,11 +554,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
   return (
     <div className="min-h-screen bg-circle-bg text-circle-text font-sans selection:bg-circle-amber selection:text-[#081c1b]">
-      <nav className="sticky top-0 z-50 bg-circle-bg/80 backdrop-blur-2xl border-b border-circle-border px-4 md:px-8 h-20 flex items-center justify-between">
-        <div className="flex items-center min-w-[120px]">
+      <nav className="sticky top-0 z-50 bg-circle-bg/85 backdrop-blur-2xl border-b border-circle-border px-4 md:px-8 h-16 md:h-20 flex items-center justify-between gap-3">
+        <div className="flex items-center min-w-[120px] shrink-0">
           {isAtHome ? (
             <div className="cursor-pointer" onClick={() => handleNav(0)}>
-              <span className="font-black text-base md:text-lg uppercase tracking-widest text-circle-amber">
+              <span className="font-black text-sm md:text-lg uppercase tracking-[0.28em] text-circle-amber">
                 {APP_NAME}
               </span>
             </div>
@@ -533,60 +576,201 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
           )}
         </div>
 
-        <div className="flex items-center gap-2 md:gap-6">
-          <GooeyNav
-            items={[
-              { label: t("nav.feed"), href: "#" },
-              { label: t("nav.map"), href: "#" },
-              { label: t("nav.spin"), href: "#" },
-              { label: t("nav.ai"), href: "#" },
-              { label: t("nav.you"), href: "#" },
-            ]}
-            onNav={handleNav}
-            initialActiveIndex={
-              currentView === "feed"
-                ? 0
-                : currentView === "map"
-                  ? 1
-                  : currentView === "spin"
-                    ? 2
-                    : currentView === "ai"
-                      ? 3
-                      : 4
-            }
-          />
-          {user?.isAdmin && (
-            <Link
-              href="/admin"
-              className="text-circle-frost/40 hover:text-circle-amber transition-colors p-2"
-              title={t("nav.admin")}
-            >
-              <Shield size={20} />
-            </Link>
-          )}
-          <LanguageToggle />
-          <ThemeToggle />
-          {user ? (
-            <button
-              onClick={handleLogout}
-              className="text-circle-frost/40 hover:text-circle-text transition-colors p-2"
-              title={t("auth.toLogin")}
-            >
-              <LogOut size={20} />
-            </button>
-          ) : (
-            <button
-              onClick={() => setAuthOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-circle-amber text-[#081c1b] rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-circle-honey transition-all"
-            >
-              <LogIn size={16} />
-              <span className="hidden sm:inline">{t("auth.enter")}</span>
-            </button>
-          )}
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="hidden lg:flex items-center gap-4">
+            <GooeyNav
+              items={[
+                { label: t("nav.feed"), href: "#" },
+                { label: t("nav.map"), href: "#" },
+                { label: t("nav.spin"), href: "#" },
+                { label: t("nav.ai"), href: "#" },
+                { label: t("nav.you"), href: "#" },
+              ]}
+              onNav={handleNav}
+              initialActiveIndex={
+                currentView === "feed"
+                  ? 0
+                  : currentView === "map"
+                    ? 1
+                    : currentView === "spin"
+                      ? 2
+                      : currentView === "ai"
+                        ? 3
+                        : 4
+              }
+            />
+            {user?.isAdmin && (
+              <Link
+                href="/admin"
+                className="text-circle-frost/40 hover:text-circle-amber transition-colors p-2"
+                title={t("nav.admin")}
+              >
+                <Shield size={20} />
+              </Link>
+            )}
+            <LanguageToggle />
+            <ThemeToggle />
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="text-circle-frost/40 hover:text-circle-text transition-colors p-2"
+                title={t("auth.toLogin")}
+              >
+                <LogOut size={20} />
+              </button>
+            ) : (
+              <button
+                onClick={() => setAuthOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-circle-amber text-[#081c1b] rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-circle-honey transition-all"
+              >
+                <LogIn size={16} />
+                <span className="hidden sm:inline">{t("auth.enter")}</span>
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="lg:hidden inline-flex items-center justify-center h-11 w-11 rounded-2xl border border-circle-border bg-circle-card/80 text-circle-text/80 hover:text-circle-amber hover:border-circle-amber/60 transition-all"
+            aria-label={mobileNavOpen ? "Fermer le menu" : "Ouvrir le menu"}
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen((value) => !value)}
+          >
+            {mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
       </nav>
 
-      <main className="container mx-auto max-w-5xl pt-16 pb-32 px-4 md:px-8">
+      <AnimatePresence>
+        {mobileNavOpen && (
+          <>
+            <motion.button
+              type="button"
+              aria-label="Fermer le menu"
+              className="fixed inset-0 z-40 bg-[#041111]/70 backdrop-blur-sm lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileNavOpen(false)}
+            />
+            <motion.aside
+              className="fixed right-0 top-0 bottom-0 z-50 w-[min(88vw,22rem)] rounded-l-[2rem] border-l border-y border-circle-border bg-circle-bg shadow-2xl shadow-black/30 p-5 lg:hidden overflow-y-auto"
+              initial={{ x: 32, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 32, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 28 }}
+            >
+              <div className="flex items-center justify-between gap-3 pb-5 border-b border-circle-border">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.35em] text-circle-frost/40 font-black">
+                    {APP_NAME}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-circle-frost/70">
+                    Navigation
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center h-10 w-10 rounded-2xl border border-circle-border bg-circle-card text-circle-text/70"
+                  aria-label="Fermer le menu"
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                {[
+                  { label: t("nav.feed"), index: 0 },
+                  { label: t("nav.map"), index: 1 },
+                  { label: t("nav.spin"), index: 2 },
+                  { label: t("nav.ai"), index: 3 },
+                  { label: t("nav.you"), index: 4 },
+                ].map((item) => {
+                  const active =
+                    (item.index === 0 && currentView === "feed") ||
+                    (item.index === 1 && currentView === "map") ||
+                    (item.index === 2 && currentView === "spin") ||
+                    (item.index === 3 && currentView === "ai") ||
+                    (item.index === 4 && currentView === "profile");
+
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={() => {
+                        handleNav(item.index);
+                        setMobileNavOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between rounded-2xl border px-4 py-4 text-left transition-all ${
+                        active
+                          ? "border-circle-amber/60 bg-circle-amber/10 text-circle-amber"
+                          : "border-circle-border bg-circle-card/70 text-circle-text/80 hover:border-circle-frost/30 hover:bg-circle-card"
+                      }`}
+                    >
+                      <span className="text-sm font-black uppercase tracking-[0.28em]">
+                        {item.label}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-[0.35em] text-circle-frost/40">
+                        {active ? "Current" : "Open"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-circle-border bg-circle-card/70 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-circle-frost/40 font-black">
+                    Tools
+                  </p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <LanguageToggle />
+                    <ThemeToggle />
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-circle-border bg-circle-card/70 p-3 flex min-h-[10rem] flex-col justify-center gap-2">
+                  {user?.isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="flex items-center justify-center gap-2 rounded-xl border border-circle-border bg-circle-bg/70 px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/70"
+                      onClick={() => setMobileNavOpen(false)}
+                    >
+                      <Shield size={14} />
+                      Admin
+                    </Link>
+                  )}
+                  {user ? (
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setMobileNavOpen(false);
+                      }}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-circle-text px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-bg"
+                    >
+                      <LogOut size={14} />
+                      Logout
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setAuthOpen(true);
+                        setMobileNavOpen(false);
+                      }}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-circle-amber px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-[#081c1b]"
+                    >
+                      <LogIn size={14} />
+                      Login
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      <main className="container mx-auto max-w-5xl pt-8 md:pt-16 pb-24 md:pb-32 px-4 md:px-8">
         <AnimatePresence mode="wait">
           {currentView === "feed" && (
             <MDiv
@@ -594,7 +778,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="space-y-32"
+              className="space-y-20 md:space-y-32"
             >
               {!viewAllCountry && (
                 <>
@@ -621,6 +805,37 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-20 pr-10 py-8 bg-circle-card border border-circle-border rounded-[2.5rem] focus:border-circle-teal transition-all text-2xl font-black text-circle-text placeholder-circle-frost/10 uppercase tracking-widest outline-none"
                   />
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                    <SlidersHorizontal size={14} />
+                    <span>{t("feed.filters")}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: "all", label: t("feed.filter.all") },
+                      { key: "top", label: t("feed.filter.top") },
+                      { key: "reviews", label: t("feed.filter.reviews") },
+                      { key: "website", label: t("feed.filter.website") },
+                    ].map((item) => {
+                      const active = feedFilter === item.key;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => setFeedFilter(item.key as FeedFilter)}
+                          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
+                            active
+                              ? "border-circle-amber/50 bg-circle-amber text-[#081c1b]"
+                              : "border-circle-border bg-circle-card/70 text-circle-frost/60 hover:text-circle-text hover:border-circle-frost/30"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
