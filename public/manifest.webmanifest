@@ -2,7 +2,7 @@
   "name": "Circle",
   "short_name": "Circle",
   "description": "Découvrez et notez les restaurants du monde à Nantes.",
-  "start_url": "/home",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#081c1b",
@@ -38,7 +38,7 @@
     {
       "name": "Roulette",
       "short_name": "Roulette",
-      "url": "/home",
+      "url": "/",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {

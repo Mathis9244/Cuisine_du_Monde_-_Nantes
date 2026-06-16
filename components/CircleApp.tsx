@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, LogOut, ArrowLeft, Shield, Home, X } from "lucide-react";
+import { Search, LogOut, ArrowLeft, Shield, X, LogIn } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { Restaurant, FriendRating } from "@/lib/types";
@@ -14,6 +14,7 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
 import WheelOfFortune from "./WheelOfFortune";
+import HomeHero from "./HomeHero";
 import RestaurantList from "./RestaurantList";
 import StarRating from "./StarRating";
 import GooeyNav from "./GooeyNav";
@@ -58,7 +59,11 @@ const CircleApp: React.FC = () => {
   const { t } = useI18n();
   const [currentView, setCurrentView] = useState<ViewMode>("feed");
   const [ratingTarget, setRatingTarget] = useState<Restaurant | null>(null);
-  const [viewAllCountry, setViewAllCountry] = useState<string | null>(null);
+  // Initialise le filtre cuisine depuis l'URL pour éviter un double fetch au montage.
+  const [viewAllCountry, setViewAllCountry] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("cuisine");
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [user, setUser] = useState<SessionUser | null>(null);
   const [targetProfile, setTargetProfile] = useState<{
@@ -78,10 +83,13 @@ const CircleApp: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [wheelCountries, setWheelCountries] = useState<string[]>([]);
+  const [wheelLoading, setWheelLoading] = useState(true);
+  const [wheelError, setWheelError] = useState<string | null>(null);
   const [mapRestaurants, setMapRestaurants] = useState<Restaurant[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
 
   // Débounce léger pour une recherche fluide (évite le lag au clavier).
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -90,9 +98,15 @@ const CircleApp: React.FC = () => {
     return () => window.clearTimeout(id);
   }, [searchTerm]);
 
+  // Evite que des réponses "anciennes" (requêtes lentes) écrasent le state récent.
+  const loadRestaurantsReqId = React.useRef(0);
+
   const applyLocalRatings = useCallback(
     (list: Restaurant[], current: SessionUser | null): Restaurant[] => {
-      if (!current) return list;
+      // Sans user connecté, on retire les ratings ajoutés côté client.
+      if (!current) {
+        return list.map((r) => ({ ...r, friendRatings: undefined }));
+      }
       const saved = localStorage.getItem("nwe-ratings-store");
       if (!saved) return list;
       const parsed = JSON.parse(saved) as Record<string, number>;
@@ -114,6 +128,7 @@ const CircleApp: React.FC = () => {
 
   const loadRestaurants = useCallback(
     async (current: SessionUser | null, opts?: { append?: boolean; page?: number }) => {
+      const reqId = ++loadRestaurantsReqId.current;
       const effectivePage = opts?.page ?? 1;
       const isAppend = Boolean(opts?.append);
       if (isAppend) setLoadingMore(true);
@@ -131,16 +146,21 @@ const CircleApp: React.FC = () => {
           sortBy: "name",
           sortOrder: "asc",
         });
+        if (reqId !== loadRestaurantsReqId.current) return;
         setTotalPages(res.meta.totalPages);
         const next = applyLocalRatings(res.data, current);
         setRestaurants((prev) => (isAppend ? [...prev, ...next] : next));
       } catch (err) {
-        setRestaurantsError(
-          err instanceof Error ? err.message : "Erreur de chargement",
-        );
+        if (reqId === loadRestaurantsReqId.current) {
+          setRestaurantsError(
+            err instanceof Error ? err.message : "Erreur de chargement",
+          );
+        }
       } finally {
-        if (isAppend) setLoadingMore(false);
-        else setRestaurantsLoading(false);
+        if (reqId === loadRestaurantsReqId.current) {
+          if (isAppend) setLoadingMore(false);
+          else setRestaurantsLoading(false);
+        }
       }
     },
     [applyLocalRatings, debouncedSearch, viewAllCountry],
@@ -195,25 +215,26 @@ const CircleApp: React.FC = () => {
     };
   }, []);
 
-  // Pré-filtrage du feed via ?cuisine=... (ex: redirection depuis la page Home).
-  useEffect(() => {
-    const cuisine = new URLSearchParams(window.location.search).get("cuisine");
-    if (cuisine) {
-      setViewAllCountry(cuisine);
-      setCurrentView("feed");
-    }
-  }, []);
-
-  // Recharge la liste quand les filtres ou l'utilisateur changent.
+  // Recharge la liste quand les filtres changent.
+  // IMPORTANT : on ne refetch pas quand `user` arrive, pour éviter un double fetch.
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     setPage(1);
     void loadRestaurants(user, { page: 1 });
-  }, [debouncedSearch, viewAllCountry, user?.id, loadRestaurants]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, viewAllCountry, loadRestaurants]);
 
-  // Cuisines complètes pour la roue (API dédiée, pas seulement la page courante).
+  // Quand l'utilisateur change (login/logout), on applique juste les ratings côté client.
+  useEffect(() => {
+    if (restaurants.length === 0) return;
+    setRestaurants((prev) => applyLocalRatings(prev, user));
+  }, [user, applyLocalRatings]); 
+
+  // Cuisines complètes pour la roue (section accueil + onglet Spin).
   useEffect(() => {
     let active = true;
+    setWheelLoading(true);
+    setWheelError(null);
     fetchCuisines()
       .then((slugs) => {
         if (!active) return;
@@ -221,8 +242,16 @@ const CircleApp: React.FC = () => {
           Array.from(new Set(slugs.map((s) => cuisineToCountry(s)))).sort(),
         );
       })
-      .catch(() => {
-        if (active) setWheelCountries([]);
+      .catch((err) => {
+        if (active) {
+          setWheelError(
+            err instanceof Error ? err.message : "Erreur de chargement",
+          );
+          setWheelCountries([]);
+        }
+      })
+      .finally(() => {
+        if (active) setWheelLoading(false);
       });
     return () => {
       active = false;
@@ -231,10 +260,11 @@ const CircleApp: React.FC = () => {
 
   // Données carte : charge tous les restos géolocalisés à l'ouverture de l'onglet.
   useEffect(() => {
-    if (currentView !== "map" || !user) return;
+    if (currentView !== "map") return;
     let active = true;
     setMapLoading(true);
-    fetchRestaurants({ limit: 300, sortBy: "name", sortOrder: "asc" })
+    // Limite réduite pour accélérer le chargement de la carte.
+    fetchRestaurants({ limit: 200, sortBy: "name", sortOrder: "asc" })
       .then((res) => {
         if (active) setMapRestaurants(applyLocalRatings(res.data, user));
       })
@@ -267,41 +297,14 @@ const CircleApp: React.FC = () => {
   ]);
 
   useEffect(() => {
-    if (!ratingTarget) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setRatingTarget(null);
+      if (e.key !== "Escape") return;
+      if (ratingTarget) setRatingTarget(null);
+      if (authOpen) setAuthOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ratingTarget]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    setAuthLoading(true);
-    const supabase = getSupabaseBrowserClient();
-    try {
-      if (authMode === "join") {
-        const { error } = await supabase.auth.signUp({
-          email: authForm.email,
-          password: authForm.password,
-          options: { data: { username: authForm.username } },
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: authForm.email,
-          password: authForm.password,
-        });
-        if (error) throw error;
-      }
-      setAuthForm({ email: "", password: "", username: "" });
-    } catch (err) {
-      setAuthError(err instanceof Error ? err.message : t("auth.error"));
-    } finally {
-      setAuthLoading(false);
-    }
-  };
+  }, [ratingTarget, authOpen]);
 
   const handleLogout = () => {
     const supabase = getSupabaseBrowserClient();
@@ -338,36 +341,150 @@ const CircleApp: React.FC = () => {
   // La recherche + filtre cuisine sont appliqués côté API (pagination).
   const filteredRestaurants = useMemo(() => restaurants, [restaurants]);
 
+  const requireAuth = useCallback((action: () => void) => {
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    action();
+  }, [user]);
+
+  const handleRateRequest = useCallback(
+    (restaurant: Restaurant) => {
+      requireAuth(() => setRatingTarget(restaurant));
+    },
+    [requireAuth],
+  );
+
   // Ordre des onglets : 0=Feed, 1=Map, 2=Spin, 3=AI, 4=You
   const handleNav = (index: number) => {
     setViewAllCountry(null);
     setTargetProfile(null);
-    if (index === 0) setCurrentView("feed");
-    else if (index === 1) setCurrentView("map");
+    if (index === 0) {
+      setCurrentView("feed");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (index === 1) setCurrentView("map");
     else if (index === 2) setCurrentView("spin");
     else if (index === 3) setCurrentView("ai");
     else if (index === 4) {
-      if (user) {
+      requireAuth(() => {
         setTargetProfile({
-          name: user.username,
-          avatar: avatarFor(user.username),
+          name: user!.username,
+          avatar: avatarFor(user!.username),
         });
         setCurrentView("profile");
-      }
+      });
     }
   };
 
   const handleProfileView = (profile: { name: string; avatar: string }) => {
-    setTargetProfile(profile);
-    setCurrentView("profile");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    requireAuth(() => {
+      setTargetProfile(profile);
+      setCurrentView("profile");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   };
 
   const handleCountrySelect = (country: string) => {
     setViewAllCountry(country);
     setCurrentView("feed");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => {
+      document.getElementById("explore")?.scrollIntoView({ behavior: "smooth" });
+    }, 150);
   };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthLoading(true);
+    const supabase = getSupabaseBrowserClient();
+    try {
+      if (authMode === "join") {
+        const { error } = await supabase.auth.signUp({
+          email: authForm.email,
+          password: authForm.password,
+          options: { data: { username: authForm.username } },
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: authForm.email,
+          password: authForm.password,
+        });
+        if (error) throw error;
+      }
+      setAuthForm({ email: "", password: "", username: "" });
+      setAuthOpen(false);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : t("auth.error"));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const authFormContent = (
+    <form onSubmit={handleLogin} className="space-y-6">
+      {authError && (
+        <div className="px-5 py-4 bg-red-500/10 border border-red-500/30 rounded-3xl text-red-200 text-xs font-bold tracking-widest">
+          {authError}
+        </div>
+      )}
+      {authMode === "join" && (
+        <input
+          required
+          type="text"
+          placeholder={t("auth.name")}
+          value={authForm.username}
+          onChange={(e) =>
+            setAuthForm({ ...authForm, username: e.target.value })
+          }
+          className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
+        />
+      )}
+      <input
+        required
+        type="email"
+        placeholder={t("auth.email")}
+        value={authForm.email}
+        onChange={(e) =>
+          setAuthForm({ ...authForm, email: e.target.value })
+        }
+        className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
+      />
+      <input
+        required
+        type="password"
+        placeholder={t("auth.password")}
+        value={authForm.password}
+        onChange={(e) =>
+          setAuthForm({ ...authForm, password: e.target.value })
+        }
+        className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
+      />
+      <button
+        type="submit"
+        disabled={authLoading}
+        className="w-full bg-circle-amber text-[#081c1b] py-5 rounded-3xl font-black text-sm uppercase tracking-[0.3em] active:scale-[0.97] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {authLoading
+          ? "..."
+          : authMode === "login"
+            ? t("auth.enter")
+            : t("auth.join")}
+      </button>
+      <div className="text-center">
+        <button
+          type="button"
+          onClick={() =>
+            setAuthMode(authMode === "join" ? "login" : "join")
+          }
+          className="text-[10px] font-black uppercase tracking-[0.4em] text-circle-frost/30 hover:text-circle-text transition-all"
+        >
+          {authMode === "join" ? t("auth.toLogin") : t("auth.toJoin")}
+        </button>
+      </div>
+    </form>
+  );
 
   const isAtHome = currentView === "feed" && !viewAllCountry;
 
@@ -388,87 +505,6 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
           </pre>
           <p className="text-circle-frost/40 text-xs">{t("setup.hint")}</p>
         </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-circle-bg flex items-center justify-center p-6 font-sans">
-        <MDiv
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm"
-        >
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-black text-circle-text tracking-tighter mb-4 uppercase">
-              {APP_NAME}
-            </h1>
-            <p className="text-circle-frost/40 text-sm font-black uppercase tracking-[0.3em]">
-              {t("auth.tagline")}
-            </p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-6">
-            {authError && (
-              <div className="px-5 py-4 bg-red-500/10 border border-red-500/30 rounded-3xl text-red-200 text-xs font-bold tracking-widest">
-                {authError}
-              </div>
-            )}
-            {authMode === "join" && (
-              <input
-                required
-                type="text"
-                placeholder={t("auth.name")}
-                value={authForm.username}
-                onChange={(e) =>
-                  setAuthForm({ ...authForm, username: e.target.value })
-                }
-                className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
-              />
-            )}
-            <input
-              required
-              type="email"
-              placeholder={t("auth.email")}
-              value={authForm.email}
-              onChange={(e) =>
-                setAuthForm({ ...authForm, email: e.target.value })
-              }
-              className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
-            />
-            <input
-              required
-              type="password"
-              placeholder={t("auth.password")}
-              value={authForm.password}
-              onChange={(e) =>
-                setAuthForm({ ...authForm, password: e.target.value })
-              }
-              className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
-            />
-            <button
-              type="submit"
-              disabled={authLoading}
-              className="w-full bg-circle-amber text-[#081c1b] py-5 rounded-3xl font-black text-sm uppercase tracking-[0.3em] active:scale-[0.97] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {authLoading
-                ? "..."
-                : authMode === "login"
-                  ? t("auth.enter")
-                  : t("auth.join")}
-            </button>
-          </form>
-          <div className="mt-10 text-center">
-            <button
-              onClick={() =>
-                setAuthMode(authMode === "join" ? "login" : "join")
-              }
-              className="text-[10px] font-black uppercase tracking-[0.4em] text-circle-frost/30 hover:text-circle-text transition-all"
-            >
-              {authMode === "join" ? t("auth.toLogin") : t("auth.toJoin")}
-            </button>
-          </div>
-        </MDiv>
       </div>
     );
   }
@@ -519,7 +555,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       : 4
             }
           />
-          {user.isAdmin && (
+          {user?.isAdmin && (
             <Link
               href="/admin"
               className="text-circle-frost/40 hover:text-circle-amber transition-colors p-2"
@@ -528,21 +564,25 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               <Shield size={20} />
             </Link>
           )}
-          <Link
-            href="/home"
-            className="text-circle-frost/40 hover:text-circle-amber transition-colors p-2"
-            title={t("nav.home")}
-          >
-            <Home size={20} />
-          </Link>
           <LanguageToggle />
           <ThemeToggle />
-          <button
-            onClick={handleLogout}
-            className="text-circle-frost/40 hover:text-circle-text transition-colors p-2"
-          >
-            <LogOut size={20} />
-          </button>
+          {user ? (
+            <button
+              onClick={handleLogout}
+              className="text-circle-frost/40 hover:text-circle-text transition-colors p-2"
+              title={t("auth.toLogin")}
+            >
+              <LogOut size={20} />
+            </button>
+          ) : (
+            <button
+              onClick={() => setAuthOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-circle-amber text-[#081c1b] rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-circle-honey transition-all"
+            >
+              <LogIn size={16} />
+              <span className="hidden sm:inline">{t("auth.enter")}</span>
+            </button>
+          )}
         </div>
       </nav>
 
@@ -556,7 +596,19 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               exit={{ opacity: 0 }}
               className="space-y-32"
             >
-              <div className="max-w-3xl mx-auto">
+              {!viewAllCountry && (
+                <>
+                  <HomeHero
+                    cuisines={countries}
+                    loading={wheelLoading}
+                    error={wheelError}
+                    onWheelResult={handleCountrySelect}
+                  />
+                  <div className="border-t border-circle-border" />
+                </>
+              )}
+
+              <div className="max-w-3xl mx-auto pt-4">
                 <div className="relative group">
                   <Search
                     className="absolute left-8 top-1/2 -translate-y-1/2 text-circle-teal/40"
@@ -599,7 +651,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 ) : (
                   <RestaurantList
                     restaurants={filteredRestaurants}
-                    onRate={setRatingTarget}
+                    onRate={handleRateRequest}
                     onViewAll={handleCountrySelect}
                     onProfileClick={handleProfileView}
                     isFiltered={!!viewAllCountry}
@@ -644,11 +696,10 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               key="map"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
             >
               <MapView
                 restaurants={mapRestaurants}
-                onRate={setRatingTarget}
+                onRate={handleRateRequest}
                 loading={mapLoading}
               />
             </MDiv>
@@ -676,7 +727,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 profile={targetProfile}
                 restaurants={restaurants}
                 onBack={() => setCurrentView("feed")}
-                onRate={setRatingTarget}
+                onRate={handleRateRequest}
                 onProfileClick={handleProfileView}
               />
             </MDiv>
@@ -691,6 +742,33 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
       </footer>
 
       <AnimatePresence>
+        {authOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <MDiv
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAuthOpen(false)}
+              className="absolute inset-0 bg-black/95 backdrop-blur-xl"
+            />
+            <MDiv
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-sm bg-circle-card border border-circle-border rounded-[3rem] p-10"
+            >
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-black text-circle-amber uppercase tracking-tighter">
+                  {APP_NAME}
+                </h2>
+                <p className="text-circle-frost/40 text-xs font-black uppercase tracking-[0.3em] mt-2">
+                  {t("auth.tagline")}
+                </p>
+              </div>
+              {authFormContent}
+            </MDiv>
+          </div>
+        )}
         {ratingTarget && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
             <MDiv
