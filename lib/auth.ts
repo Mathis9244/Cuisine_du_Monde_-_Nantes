@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "./supabase/server";
+import { createSupabaseAdminClient } from "./supabase/admin";
 
 const ADMIN_ROLE = process.env.ADMIN_ROLE || "admin";
 
@@ -10,6 +11,29 @@ export async function getCurrentUser(): Promise<User | null> {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
+}
+
+/**
+ * Utilisateur courant via cookies OU en-tête Authorization (upload navigateur).
+ */
+export async function getCurrentUserFromRequest(
+  req: Request,
+): Promise<User | null> {
+  const fromCookies = await getCurrentUser();
+  if (fromCookies) return fromCookies;
+
+  const header = req.headers.get("authorization");
+  const token = header?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!token) return null;
+
+  try {
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin.auth.getUser(token);
+    if (error || !data.user) return null;
+    return data.user;
+  } catch {
+    return null;
+  }
 }
 
 /** Vrai si l'utilisateur a le rôle admin (app_metadata.role ou user_metadata.role). */

@@ -70,3 +70,48 @@ create policy "Lecture publique des restaurants actifs"
 --
 -- L'utilisateur doit se reconnecter pour rafraîchir son token.
 -- =============================================================================
+
+-- =============================================================================
+-- Storage : bucket "Images" (photos de profil)
+-- Dashboard : bucket public, MIME autorisés = image/jpeg, image/png, image/gif
+-- L'upload passe par /api/profile/avatar (service role) : les policies ci-dessous
+-- sont optionnelles mais recommandées si tu veux aussi un upload direct client.
+-- =============================================================================
+
+-- insert / update / delete : uniquement son dossier avatars/{user_id}/
+drop policy if exists "Users upload own avatar" on storage.objects;
+create policy "Users upload own avatar"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'Images'
+    and (storage.foldername(name))[1] = 'avatars'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+drop policy if exists "Users update own avatar" on storage.objects;
+create policy "Users update own avatar"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'Images'
+    and (storage.foldername(name))[1] = 'avatars'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+drop policy if exists "Users delete own avatar" on storage.objects;
+create policy "Users delete own avatar"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'Images'
+    and (storage.foldername(name))[1] = 'avatars'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+-- lecture publique des fichiers du bucket Images
+drop policy if exists "Public read Images bucket" on storage.objects;
+create policy "Public read Images bucket"
+  on storage.objects for select
+  to public
+  using (bucket_id = 'Images');

@@ -8,13 +8,11 @@ import { useI18n } from "@/lib/i18n";
 const MDiv = motion.div as any;
 
 interface WheelOfFortuneProps {
-  /** Types de cuisine affichés sur la roue (ex: Japan, Italy, ...). */
   segments: string[];
-  /** Appelé avec le type tiré (pour rediriger vers le feed filtré). */
+  excludedSegments?: string[];
   onResult: (segment: string) => void;
 }
 
-// Palette des parts (couleurs fixes, décoratives) + couleur de texte contrastée.
 const SLICE_COLORS: { fill: string; text: string }[] = [
   { fill: "#ff9f1c", text: "#081c1b" },
   { fill: "#2ec4b6", text: "#081c1b" },
@@ -25,15 +23,26 @@ const SLICE_COLORS: { fill: string; text: string }[] = [
 
 const CX = 100;
 const CY = 100;
-const R = 96;
+const R = 92;
+const HUB_R = 22;
 
 function pointToXY(angleDeg: number, radius: number): [number, number] {
   const rad = (angleDeg * Math.PI) / 180;
   return [CX + radius * Math.sin(rad), CY - radius * Math.cos(rad)];
 }
 
+function formatLabel(seg: string, count: number): string {
+  const max = count > 14 ? 6 : count > 10 ? 8 : count > 6 ? 10 : 14;
+  if (seg.length <= max) return seg;
+  return `${seg.slice(0, max - 1)}…`;
+}
+
+const EXCLUDED_FILL = "#2a3a38";
+const EXCLUDED_TEXT = "rgba(203, 243, 240, 0.45)";
+
 const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
   segments,
+  excludedSegments = [],
   onResult,
 }) => {
   const { t } = useI18n();
@@ -41,23 +50,36 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
   const [winner, setWinner] = useState<string | null>(null);
   const controls = useAnimation();
 
+  const excludedSet = useMemo(
+    () => new Set(excludedSegments),
+    [excludedSegments],
+  );
+
+  const activeIndices = useMemo(
+    () =>
+      segments
+        .map((seg, i) => ({ seg, i }))
+        .filter(({ seg }) => !excludedSet.has(seg))
+        .map(({ i }) => i),
+    [segments, excludedSet],
+  );
+
   const count = segments.length;
   const slice = count > 0 ? 360 / count : 360;
 
   const labelFontSize = useMemo(
-    () => Math.max(5.5, Math.min(10, 120 / Math.max(count, 1))),
+    () => Math.max(6, Math.min(11, 130 / Math.max(count, 1))),
     [count],
   );
 
   const spinWheel = async () => {
-    if (isSpinning || count === 0) return;
+    if (isSpinning || activeIndices.length === 0) return;
     setIsSpinning(true);
     setWinner(null);
 
-    // On choisit d'abord l'index gagnant, puis on calcule la rotation exacte
-    // pour qu'il s'arrête sous le curseur (haut). Garantit l'exactitude visuelle.
-    const winningIndex = Math.floor(Math.random() * count);
-    const center = winningIndex * slice + slice / 2;
+    const pick =
+      activeIndices[Math.floor(Math.random() * activeIndices.length)] ?? 0;
+    const center = pick * slice + slice / 2;
     const targetMod = (360 - center) % 360;
     const fullSpins = 360 * 6;
     const finalRotation = fullSpins + targetMod;
@@ -68,115 +90,198 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
     });
     controls.set({ rotate: targetMod });
 
-    const won = segments[winningIndex];
+    const won = segments[pick];
     setWinner(won);
     setIsSpinning(false);
 
-    // Petite pause pour laisser voir le résultat, puis redirection vers le feed.
     setTimeout(() => onResult(won), 1100);
   };
 
+  const canSpin = !isSpinning && activeIndices.length > 0;
+
   return (
-    <div className="flex flex-col items-center py-12 md:py-16 bg-circle-card border border-circle-border rounded-[3rem] shadow-2xl">
-      <div className="text-center mb-10 px-4">
-        <h3 className="text-2xl md:text-3xl font-black text-circle-text uppercase tracking-[0.2em]">
+    <div className="flex w-full flex-col items-center rounded-[2rem] border border-circle-border bg-circle-card px-4 py-8 shadow-xl sm:rounded-[2.5rem] sm:px-6 sm:py-10 md:py-12">
+      <div className="mb-6 max-w-sm text-center sm:mb-8">
+        <h3 className="text-xl font-black uppercase tracking-[0.18em] text-circle-text sm:text-2xl md:text-3xl md:tracking-[0.2em]">
           {t("wheel.title")}
         </h3>
-        <p className="text-circle-frost/50 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] mt-2">
+        <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.25em] text-circle-frost/45 sm:text-xs sm:tracking-[0.3em]">
           {t("wheel.subtitle")}
         </p>
       </div>
 
-      <div className="relative w-[18rem] h-[18rem] sm:w-[22rem] sm:h-[22rem]">
-        {/* Curseur (haut) */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 z-40 w-9 h-9 text-circle-amber drop-shadow-[0_0_12px_rgba(255,159,28,0.6)]">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 22 L3 5 h18 z" />
-          </svg>
+      {/* Mobile-first : largeur fluide, hauteur = largeur */}
+      <div className="relative w-full max-w-[min(100%,18.5rem)] sm:max-w-[21rem] md:max-w-[23rem]">
+        {/* Pointeur */}
+        <div
+          className="pointer-events-none absolute left-1/2 top-0 z-30 -translate-x-1/2 -translate-y-1"
+          aria-hidden
+        >
+          <div className="flex flex-col items-center">
+            <div className="h-0 w-0 border-x-[10px] border-b-[14px] border-x-transparent border-b-circle-amber drop-shadow-[0_2px_8px_rgba(255,159,28,0.45)] sm:border-x-[11px] sm:border-b-[16px]" />
+            <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-circle-amber/80" />
+          </div>
         </div>
-
-        <div className="absolute inset-0 rounded-full blur-3xl bg-circle-teal/10 animate-pulse" />
 
         <MDiv
           animate={controls}
-          className="w-full h-full rounded-full relative overflow-hidden shadow-2xl ring-4 ring-circle-border"
+          role="button"
+          tabIndex={0}
+          aria-label={t("wheel.spin")}
+          aria-disabled={!canSpin}
+          onClick={spinWheel}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              void spinWheel();
+            }
+          }}
+          className={`relative aspect-square w-full touch-manipulation rounded-full outline-none transition-shadow ${
+            canSpin
+              ? "cursor-pointer active:scale-[0.99]"
+              : "cursor-not-allowed"
+          }`}
+          style={{ transformOrigin: "50% 50%" }}
         >
-          <svg viewBox="0 0 200 200" className="w-full h-full">
-            <g transform="scale(1)">
-              {segments.map((seg, i) => {
-                const startAngle = i * slice;
-                const endAngle = (i + 1) * slice;
-                const [x1, y1] = pointToXY(startAngle, R);
-                const [x2, y2] = pointToXY(endAngle, R);
-                const largeArc = slice > 180 ? 1 : 0;
-                const color = SLICE_COLORS[i % SLICE_COLORS.length];
+          <svg
+            viewBox="0 0 200 200"
+            className="h-full w-full drop-shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
+            aria-hidden
+          >
+            {/* Fond disque */}
+            <circle cx={CX} cy={CY} r={R + 2} fill="#081c1b" />
 
-                const mid = startAngle + slice / 2;
-                const [lx, ly] = pointToXY(mid, R * 0.62);
-                let rot = mid - 90;
-                if (rot > 90) rot -= 180;
-                else if (rot < -90) rot += 180;
+            {/* Parts pleines (sans gap angulaire) */}
+            {segments.map((seg, i) => {
+              const startAngle = i * slice;
+              const endAngle = (i + 1) * slice;
+              const [x1, y1] = pointToXY(startAngle, R);
+              const [x2, y2] = pointToXY(endAngle, R);
+              const largeArc = slice > 180 ? 1 : 0;
+              const isExcluded = excludedSet.has(seg);
+              const color = SLICE_COLORS[i % SLICE_COLORS.length];
 
-                const label =
-                  seg.length > 12 ? `${seg.slice(0, 11)}…` : seg;
+              const mid = startAngle + slice / 2;
+              const labelRadius = count > 12 ? R * 0.68 : R * 0.72;
+              const [lx, ly] = pointToXY(mid, labelRadius);
+              let rot = mid - 90;
+              if (rot > 90) rot -= 180;
+              else if (rot < -90) rot += 180;
 
+              return (
+                <g key={`${seg}-${i}`} opacity={isExcluded ? 0.55 : 1}>
+                  <path
+                    d={`M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                    fill={isExcluded ? EXCLUDED_FILL : color.fill}
+                  />
+                  <text
+                    x={lx}
+                    y={ly}
+                    transform={`rotate(${rot} ${lx} ${ly})`}
+                    fill={isExcluded ? EXCLUDED_TEXT : color.text}
+                    fontSize={labelFontSize}
+                    fontWeight={800}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    className="select-none uppercase"
+                    style={{ letterSpacing: "0.04em" }}
+                  >
+                    {formatLabel(seg, count)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {count > 1 &&
+              segments.map((_, i) => {
+                const angle = i * slice;
+                const [x1, y1] = pointToXY(angle, HUB_R);
+                const [x2, y2] = pointToXY(angle, R);
                 return (
-                  <g key={`${seg}-${i}`}>
-                    <path
-                      d={`M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${largeArc} 1 ${x2} ${y2} Z`}
-                      fill={color.fill}
-                      stroke="#081c1b"
-                      strokeWidth={0.6}
-                    />
-                    <text
-                      x={lx}
-                      y={ly}
-                      transform={`rotate(${rot} ${lx} ${ly})`}
-                      fill={color.text}
-                      fontSize={labelFontSize}
-                      fontWeight={900}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      className="select-none uppercase"
-                      style={{ letterSpacing: "0.02em" }}
-                    >
-                      {label}
-                    </text>
-                  </g>
+                  <line
+                    key={`sep-${i}`}
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke="rgba(255, 255, 255, 0.14)"
+                    strokeWidth={0.5}
+                    strokeLinecap="round"
+                  />
                 );
               })}
-            </g>
-            {/* Moyeu central */}
-            <circle cx={CX} cy={CY} r="10" fill="#081c1b" stroke="#ff9f1c" strokeWidth="1.5" />
-            <circle cx={CX} cy={CY} r="3.5" fill="#ff9f1c" />
-          </svg>
-        </MDiv>
-      </div>
 
-      <div className="h-12 mt-8 flex items-center justify-center">
-        {winner && (
-          <MDiv
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center"
-          >
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-circle-frost/50">
-              {t("wheel.direction")}
-            </p>
-            <p className="text-2xl font-black uppercase tracking-tighter text-circle-amber">
-              {winner}
-            </p>
-          </MDiv>
+            {/* Anneau extérieur */}
+            <circle
+              cx={CX}
+              cy={CY}
+              r={R}
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.12)"
+              strokeWidth={1}
+            />
+
+            {/* Moyeu */}
+            <circle
+              cx={CX}
+              cy={CY}
+              r={HUB_R}
+              fill="#081c1b"
+              stroke="rgba(255, 159, 28, 0.55)"
+              strokeWidth={1.25}
+            />
+            <circle cx={CX} cy={CY} r={5} fill="#ff9f1c" />
+          </svg>
+
+          {/* Anneau interactif subtil */}
+          <div
+            className={`pointer-events-none absolute inset-0 rounded-full ring-1 ring-inset ${
+              canSpin ? "ring-white/10" : "ring-white/5"
+            }`}
+          />
+        </MDiv>
+
+        {canSpin && (
+          <p className="mt-3 text-center text-[9px] font-bold uppercase tracking-[0.28em] text-circle-frost/35 sm:text-[10px]">
+            {t("wheel.tap")}
+          </p>
+        )}
+        {activeIndices.length === 0 && count > 0 && (
+          <p className="mt-3 text-center text-[10px] font-bold uppercase tracking-[0.25em] text-red-300/80">
+            {t("wheel.allExcluded")}
+          </p>
         )}
       </div>
 
+      <div className="mt-6 flex min-h-[3.5rem] items-center justify-center sm:mt-8">
+        {winner ? (
+          <MDiv
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center"
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-circle-frost/45">
+              {t("wheel.direction")}
+            </p>
+            <p className="mt-1 text-xl font-black uppercase tracking-tight text-circle-amber sm:text-2xl">
+              {winner}
+            </p>
+          </MDiv>
+        ) : isSpinning ? (
+          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-circle-frost/35">
+            {t("wheel.spinning")}
+          </p>
+        ) : null}
+      </div>
+
       <button
+        type="button"
         onClick={spinWheel}
-        disabled={isSpinning || count === 0}
-        className={`mt-4 px-12 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.4em] shadow-2xl transition-all active:scale-95 flex items-center gap-3 ${
-          isSpinning || count === 0
-            ? "bg-circle-border text-circle-text/20 cursor-not-allowed"
-            : "bg-circle-amber text-[#081c1b] hover:bg-circle-honey"
+        disabled={!canSpin}
+        className={`mt-2 flex w-full max-w-xs items-center justify-center gap-2.5 rounded-2xl px-8 py-3.5 text-[10px] font-black uppercase tracking-[0.35em] shadow-lg transition-all active:scale-[0.98] sm:mt-3 sm:max-w-sm sm:py-4 sm:text-[11px] sm:tracking-[0.4em] ${
+          canSpin
+            ? "bg-circle-amber text-[#081c1b] hover:bg-circle-honey"
+            : "cursor-not-allowed bg-circle-border text-circle-text/20"
         }`}
       >
         <Compass size={16} className={isSpinning ? "animate-spin" : ""} />

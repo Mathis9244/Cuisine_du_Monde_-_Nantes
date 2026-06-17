@@ -11,6 +11,7 @@ import {
   LogIn,
   Menu,
   SlidersHorizontal,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -20,7 +21,7 @@ import type {
   Restaurant,
   FriendRating,
 } from "@/lib/types";
-import { fetchCuisines, fetchRestaurants, fetchStats } from "@/lib/api";
+import { fetchCuisines, fetchRestaurants, fetchStats, fetchRestaurant } from "@/lib/api";
 import { APP_NAME } from "@/lib/constants";
 import { countryToCuisine, cuisineToCountry } from "@/lib/mappers";
 import { haversineKm } from "@/lib/geo";
@@ -35,6 +36,8 @@ import GooeyNav from "./GooeyNav";
 import WheelOfFortune from "./WheelOfFortune";
 import WheelCountryView from "./WheelCountryView";
 import ProfileView from "./ProfileView";
+import ShareSheet from "./ShareSheet";
+import ExcludeCountryPrompt from "./ExcludeCountryPrompt";
 import AIResearch from "./AIResearch";
 import ThemeToggle from "./ThemeToggle";
 import LanguageToggle from "./LanguageToggle";
@@ -42,6 +45,12 @@ import InfiniteScrollSentinel from "./InfiniteScrollSentinel";
 import { RestaurantListSkeleton } from "./RestaurantCardSkeleton";
 import { useI18n } from "@/lib/i18n";
 import type { RestaurantStats } from "@/lib/types";
+import {
+  addExcludedCountry,
+  getExcludedCountries,
+  getRatedRestaurantIds,
+  removeExcludedCountry,
+} from "@/lib/userStore";
 
 function MapLoadingFallback() {
   const { t } = useI18n();
@@ -75,6 +84,8 @@ interface SessionUser {
   id: string;
   email: string;
   username: string;
+  bio: string;
+  avatarUrl: string;
   isAdmin: boolean;
 }
 
@@ -88,7 +99,16 @@ interface ExplorerPreferences {
 }
 
 const avatarFor = (username: string) =>
-  `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
+  `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(username)}`;
+
+function resolveAvatar(
+  username: string,
+  metadata?: Record<string, unknown>,
+): string {
+  const custom = metadata?.avatar_url;
+  if (typeof custom === "string" && custom.trim()) return custom.trim();
+  return avatarFor(username);
+}
 
 const DEFAULT_EXPLORER_PREFS: ExplorerPreferences = {
   cuisine: "",
@@ -208,6 +228,15 @@ const CircleApp: React.FC = () => {
   const [mapFilters, setMapFilters] = useState<MapFilters>(() =>
     loadJsonState("cdm-map-filters", DEFAULT_MAP_FILTERS),
   );
+  const [shareOpen, setShareOpen] = useState(false);
+  const [excludedCountries, setExcludedCountries] = useState<string[]>([]);
+  const [excludePromptOpen, setExcludePromptOpen] = useState(false);
+  const [excludePromptCountry, setExcludePromptCountry] = useState<string | null>(
+    null,
+  );
+  const [profileRestaurants, setProfileRestaurants] = useState<Restaurant[]>([]);
+  const [profileRestaurantsLoading, setProfileRestaurantsLoading] =
+    useState(false);
 
   // Débounce léger pour une recherche fluide (évite le lag au clavier).
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -254,7 +283,9 @@ const CircleApp: React.FC = () => {
         );
         const newRating: FriendRating = {
           name: current.username,
-          avatar: avatarFor(current.username),
+          avatar: resolveAvatar(current.username, {
+            avatar_url: current.avatarUrl,
+          }),
           rating: parsed[res.id],
         };
         return { ...res, friendRatings: [...others, newRating] };
@@ -315,6 +346,11 @@ const CircleApp: React.FC = () => {
         (sessionUser.user_metadata?.username as string | undefined) ||
         sessionUser.email?.split("@")[0] ||
         "user";
+      const bio = (sessionUser.user_metadata?.bio as string | undefined) || "";
+      const avatarUrl = resolveAvatar(
+        username,
+        sessionUser.user_metadata as Record<string, unknown>,
+      );
       let isAdmin = false;
       try {
         const res = await fetch("/api/auth/me");
@@ -329,6 +365,8 @@ const CircleApp: React.FC = () => {
         id: sessionUser.id,
         email: sessionUser.email || "",
         username,
+        bio,
+        avatarUrl,
         isAdmin,
       };
     };
@@ -351,6 +389,56 @@ const CircleApp: React.FC = () => {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setExcludedCountries([]);
+      return;
+    }
+    setExcludedCountries(getExcludedCountries(user.id));
+  }, [user]);
+
+  useEffect(() => {
+    if (
+      currentView !== "profile" ||
+      !user ||
+      !targetProfile ||
+      targetProfile.name !== user.username
+    ) {
+      return;
+    }
+
+    let active = true;
+    setProfileRestaurantsLoading(true);
+    const ids = getRatedRestaurantIds();
+
+    if (ids.length === 0) {
+      setProfileRestaurants([]);
+      setProfileRestaurantsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    void Promise.allSettled(ids.map((id) => fetchRestaurant(id)))
+      .then((results) => {
+        if (!active) return;
+        const loaded = results
+          .filter(
+            (r): r is PromiseFulfilledResult<Restaurant> =>
+              r.status === "fulfilled",
+          )
+          .map((r) => r.value);
+        setProfileRestaurants(applyLocalRatings(loaded, user));
+      })
+      .finally(() => {
+        if (active) setProfileRestaurantsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentView, user, targetProfile, applyLocalRatings]);
 
   // Recharge la liste quand les filtres changent.
   // IMPORTANT : on ne refetch pas quand `user` arrive, pour éviter un double fetch.
@@ -539,12 +627,14 @@ const CircleApp: React.FC = () => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (ratingTarget) setRatingTarget(null);
-      if (authOpen) setAuthOpen(false);
+      if (excludePromptOpen) setExcludePromptOpen(false);
+      else if (ratingTarget) setRatingTarget(null);
+      else if (shareOpen) setShareOpen(false);
+      else if (authOpen) setAuthOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ratingTarget, authOpen]);
+  }, [ratingTarget, authOpen, shareOpen, excludePromptOpen]);
 
   const handleLogout = () => {
     const supabase = getSupabaseBrowserClient();
@@ -554,24 +644,73 @@ const CircleApp: React.FC = () => {
     setViewAllCountry(null);
   };
 
-  const handleRateSuccess = (restaurantId: string, rating: number) => {
-    if (!user) return;
-    setRestaurants((prev) =>
-      prev.map((res) => {
-        if (res.id === restaurantId) {
-          const otherRatings = (res.friendRatings || []).filter(
-            (fr) => fr.name !== user.username,
-          );
-          const newRating: FriendRating = {
-            name: user.username,
-            avatar: avatarFor(user.username),
-            rating,
-          };
-          return { ...res, friendRatings: [...otherRatings, newRating] };
-        }
-        return res;
+  const applyRatingToList = useCallback(
+    (list: Restaurant[], restaurantId: string, rating: FriendRating) =>
+      list.map((res) => {
+        if (res.id !== restaurantId) return res;
+        const others = (res.friendRatings || []).filter(
+          (fr) => fr.name !== rating.name,
+        );
+        return { ...res, friendRatings: [...others, rating] };
       }),
+    [],
+  );
+
+  const handleRateSuccess = (restaurant: Restaurant, rating: number) => {
+    if (!user) return;
+    const newRating: FriendRating = {
+      name: user.username,
+      avatar: user.avatarUrl,
+      rating,
+    };
+    const patch = (list: Restaurant[]) =>
+      applyRatingToList(list, restaurant.id, newRating);
+
+    setRestaurants(patch);
+    setFeaturedRestaurants(patch);
+    setExplorerRestaurants(patch);
+    setMapRestaurants(patch);
+    setWheelCountryRestaurants(patch);
+    setProfileRestaurants((prev) => {
+      const exists = prev.some((r) => r.id === restaurant.id);
+      const next = patch(exists ? prev : [...prev, restaurant]);
+      return next;
+    });
+  };
+
+  const handleConfirmExclude = () => {
+    if (!user || !excludePromptCountry) return;
+    setExcludedCountries(addExcludedCountry(user.id, excludePromptCountry));
+    setExcludePromptOpen(false);
+    setExcludePromptCountry(null);
+  };
+
+  const handleToggleExcludedCountry = (country: string, excluded: boolean) => {
+    if (!user) return;
+    const next = excluded
+      ? addExcludedCountry(user.id, country)
+      : removeExcludedCountry(user.id, country);
+    setExcludedCountries(next);
+  };
+
+  const handleProfileUpdate = (next: {
+    name: string;
+    avatar: string;
+    email?: string;
+    bio?: string;
+  }) => {
+    setUser((current) =>
+      current
+        ? {
+            ...current,
+            username: next.name,
+            email: next.email ?? current.email,
+            bio: next.bio ?? "",
+            avatarUrl: next.avatar,
+          }
+        : current,
     );
+    setTargetProfile({ name: next.name, avatar: next.avatar });
   };
 
   const countries = wheelCountries.length
@@ -787,7 +926,7 @@ const CircleApp: React.FC = () => {
       requireAuth(() => {
         setTargetProfile({
           name: user!.username,
-          avatar: avatarFor(user!.username),
+          avatar: user!.avatarUrl,
         });
         setCurrentView("profile");
       });
@@ -1066,6 +1205,15 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             )}
             <LanguageToggle />
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="text-circle-frost/40 hover:text-circle-amber transition-colors p-2"
+              title={t("share.title")}
+              aria-label={t("share.title")}
+            >
+              <Share2 size={20} />
+            </button>
             {user ? (
               <button
                 onClick={handleLogout}
@@ -1084,6 +1232,16 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="lg:hidden inline-flex items-center justify-center h-11 w-11 rounded-2xl border border-circle-border bg-circle-card/80 text-circle-frost/50 hover:text-circle-amber hover:border-circle-amber/60 transition-all"
+            aria-label={t("share.title")}
+            title={t("share.title")}
+          >
+            <Share2 size={18} />
+          </button>
 
           <button
             type="button"
@@ -1187,6 +1345,17 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   <div className="mt-3 flex items-center gap-2">
                     <LanguageToggle />
                     <ThemeToggle />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShareOpen(true);
+                        setMobileNavOpen(false);
+                      }}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-circle-border bg-circle-bg/70 text-circle-frost/60"
+                      aria-label={t("share.title")}
+                    >
+                      <Share2 size={16} />
+                    </button>
                   </div>
                 </div>
                 <div className="rounded-2xl border border-circle-border bg-circle-card/70 p-3 flex min-h-[10rem] flex-col justify-center gap-2">
@@ -1637,6 +1806,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 ) : (
                   <WheelOfFortune
                     segments={wheelCountries}
+                    excludedSegments={excludedCountries}
                     onResult={handleWheelResult}
                   />
                 )}
@@ -1704,13 +1874,46 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
             >
-              <ProfileView
-                profile={targetProfile}
-                restaurants={restaurants}
-                onBack={() => setCurrentView("feed")}
-                onRate={handleRateRequest}
-                onProfileClick={handleProfileView}
-              />
+              {profileRestaurantsLoading &&
+              user &&
+              targetProfile.name === user.username ? (
+                <RestaurantListSkeleton count={2} />
+              ) : (
+                <ProfileView
+                  userId={user?.id ?? ""}
+                  profile={{
+                    name: targetProfile.name,
+                    avatar: targetProfile.avatar,
+                    email:
+                      user && targetProfile.name === user.username
+                        ? user.email
+                        : undefined,
+                    bio:
+                      user && targetProfile.name === user.username
+                        ? user.bio
+                        : undefined,
+                  }}
+                  restaurants={
+                    user && targetProfile.name === user.username
+                      ? profileRestaurants
+                      : restaurants
+                  }
+                  isOwnProfile={Boolean(
+                    user && targetProfile.name === user.username,
+                  )}
+                  excludedCountries={
+                    user && targetProfile.name === user.username
+                      ? excludedCountries
+                      : []
+                  }
+                  onBack={() => setCurrentView("feed")}
+                  onRate={handleRateRequest}
+                  onProfileClick={handleProfileView}
+                  onProfileUpdate={handleProfileUpdate}
+                  onToggleExcludedCountry={handleToggleExcludedCountry}
+                  onLogout={handleLogout}
+                />
+              )}
             </MDiv>
           )}
         </AnimatePresence>
@@ -1774,8 +1977,18 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               <StarRating
                 restaurantId={ratingTarget.id}
                 onRate={(val) => {
-                  handleRateSuccess(ratingTarget.id, val);
-                  setTimeout(() => setRatingTarget(null), 800);
+                  const rated = ratingTarget;
+                  handleRateSuccess(rated, val);
+                  window.setTimeout(() => {
+                    setRatingTarget(null);
+                    if (
+                      user &&
+                      !getExcludedCountries(user.id).includes(rated.country)
+                    ) {
+                      setExcludePromptCountry(rated.country);
+                      setExcludePromptOpen(true);
+                    }
+                  }, 800);
                 }}
               />
               <button
@@ -1789,6 +2002,18 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
           </div>
         )}
       </AnimatePresence>
+
+      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} />
+
+      <ExcludeCountryPrompt
+        open={excludePromptOpen}
+        country={excludePromptCountry}
+        onExclude={handleConfirmExclude}
+        onDismiss={() => {
+          setExcludePromptOpen(false);
+          setExcludePromptCountry(null);
+        }}
+      />
     </div>
   );
 };
