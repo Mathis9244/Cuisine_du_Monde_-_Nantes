@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, {
+  useMemo,
+  useEffect,
+  useCallback,
+  useState,
+  useRef,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -14,17 +20,33 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import type {
-  MapFilters,
-  Restaurant,
-} from "@/lib/types";
-import { fetchCuisines, fetchRestaurants, fetchStats } from "@/lib/api";
+import type { MapFilters, Restaurant } from "@/lib/types";
+import { fetchRestaurants } from "@/lib/api";
 import { APP_NAME } from "@/lib/constants";
-import { countryToCuisine, cuisineToCountry } from "@/lib/mappers";
+import { countryToCuisine } from "@/lib/mappers";
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
+import { useI18n } from "@/lib/i18n";
+import {
+  useAppUIState,
+  useAuth,
+  useFeaturedRestaurants,
+  useWheelCountries,
+  useRestaurantStats,
+  useExplorerPreferences,
+  useMapFilters,
+  ViewMode,
+  FeedFilter,
+  ExplorerSort,
+} from "@/hooks";
+import {
+  scoreRestaurantForRecommendations,
+  filterRestaurantsByFeedFilter,
+  filterExplorerResults,
+  filterMapRestaurants,
+} from "@/lib/restaurantFilters";
 import HomeHero from "./HomeHero";
 import RestaurantList from "./RestaurantList";
 import StarRating from "./StarRating";
@@ -37,8 +59,6 @@ import ThemeToggle from "./ThemeToggle";
 import LanguageToggle from "./LanguageToggle";
 import InfiniteScrollSentinel from "./InfiniteScrollSentinel";
 import { RestaurantListSkeleton } from "./RestaurantCardSkeleton";
-import { useI18n } from "@/lib/i18n";
-import type { RestaurantStats } from "@/lib/types";
 
 function MapLoadingFallback() {
   const { t } = useI18n();
@@ -49,7 +69,6 @@ function MapLoadingFallback() {
   );
 }
 
-// Leaflet utilise `window` : import dynamique sans SSR.
 const MapView = dynamic(() => import("./MapView"), {
   ssr: false,
   loading: () => <MapLoadingFallback />,
@@ -57,105 +76,64 @@ const MapView = dynamic(() => import("./MapView"), {
 
 const MDiv = motion.div as any;
 
-type ViewMode =
-  | "feed"
-  | "spin"
-  | "wheel"
-  | "wheel-result"
-  | "map"
-  | "profile"
-  | "ai";
-type FeedFilter = "all" | "top" | "reviews" | "website";
-type ExplorerSort = "recommended" | "rating" | "distance" | "newest";
-
-interface SessionUser {
-  id: string;
-  email: string;
-  username: string;
-  isAdmin: boolean;
-}
-
-interface ExplorerPreferences {
-  cuisine: string;
-  minRating: number;
-  hasWebsite: boolean;
-  sortBy: ExplorerSort;
-}
-
 const avatarFor = (username: string) =>
   `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
 
-const DEFAULT_EXPLORER_PREFS: ExplorerPreferences = {
-  cuisine: "",
-  minRating: 0,
-  hasWebsite: false,
-  sortBy: "recommended",
-};
-
-const DEFAULT_MAP_FILTERS: MapFilters = {
-  cuisine: "",
-  minRating: 0,
-  sortBy: "recommended",
-};
-
-function loadJsonState<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return { ...fallback, ...JSON.parse(raw) } as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function scoreRestaurantForRecommendations(
-  restaurant: Restaurant,
-  opts: {
-    favoriteCountries: Set<string>;
-  },
-): number {
-  let score = restaurant.rating ?? 0;
-  if (restaurant.website) score += 0.2;
-  score += Math.min(0.6, (restaurant.friendRatings?.length ?? 0) * 0.12);
-  if (opts.favoriteCountries.has(restaurant.country)) score += 0.8;
-  return score;
-}
-
 const CircleApp: React.FC = () => {
   const { t } = useI18n();
-  const [currentView, setCurrentView] = useState<ViewMode>("feed");
-  const [ratingTarget, setRatingTarget] = useState<Restaurant | null>(null);
-  // Initialise le filtre cuisine depuis l'URL pour éviter un double fetch au montage.
-  const [viewAllCountry, setViewAllCountry] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("cuisine");
-  });
-  const [feedSearchDraft, setFeedSearchDraft] = useState("");
-  const [feedSearchQuery, setFeedSearchQuery] = useState("");
-  const [explorerSearchDraft, setExplorerSearchDraft] = useState("");
-  const [explorerSearchQuery, setExplorerSearchQuery] = useState("");
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [targetProfile, setTargetProfile] = useState<{
-    name: string;
-    avatar: string;
-  } | null>(null);
-  const [authMode, setAuthMode] = useState<"login" | "join">("login");
-  const [authForm, setAuthForm] = useState({
-    email: "",
-    password: "",
-    username: "",
-  });
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [restaurantsLoading, setRestaurantsLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [restaurantsError, setRestaurantsError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [wheelCountries, setWheelCountries] = useState<string[]>([]);
-  const [wheelLoading, setWheelLoading] = useState(true);
-  const [wheelError, setWheelError] = useState<string | null>(null);
-  const [wheelCountry, setWheelCountry] = useState<string | null>(null);
+
+  // UI State
+  const {
+    state,
+    setCurrentView,
+    setRatingTarget,
+    setViewAllCountry,
+    setWheelCountry,
+    setAuthOpen,
+    setAuthMode,
+    setMobileNavOpen,
+    setFeedFilter,
+    setFeedSearchDraft,
+    setFeedSearchQuery,
+    setExplorerSearchDraft,
+    setExplorerSearchQuery,
+    setTargetProfile,
+  } = useAppUIState();
+
+  // Authentication
+  const { user, logout } = useAuth();
+
+  // Data fetching hooks
+  const { restaurants: featuredRestaurants, loading: featuredLoading } =
+    useFeaturedRestaurants();
+  const { countries: wheelCountries, loading: wheelLoading } =
+    useWheelCountries();
+  const restaurantStats = useRestaurantStats();
+  const {
+    prefs: explorerPrefs,
+    updatePrefs: updateExplorerPrefs,
+    reset: resetExplorerPrefs,
+  } = useExplorerPreferences();
+  const { filters: mapFilters, updateFilters: updateMapFilters } =
+    useMapFilters();
+
+  // Feed restaurants
+  const [feedRestaurants, setFeedRestaurants] = useState<Restaurant[]>([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedLoadingMore, setFeedLoadingMore] = useState(false);
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [feedPage, setFeedPage] = useState(1);
+  const [feedTotalPages, setFeedTotalPages] = useState(1);
+  const loadFeedReqId = useRef(0);
+
+  // Explorer/Spin view
+  const [explorerRestaurants, setExplorerRestaurants] = useState<Restaurant[]>(
+    [],
+  );
+  const [explorerLoading, setExplorerLoading] = useState(false);
+  const [explorerError, setExplorerError] = useState<string | null>(null);
+
+  // Wheel result
   const [wheelCountryRestaurants, setWheelCountryRestaurants] = useState<
     Restaurant[]
   >([]);
@@ -163,264 +141,75 @@ const CircleApp: React.FC = () => {
   const [wheelCountryError, setWheelCountryError] = useState<string | null>(
     null,
   );
+  const loadWheelCountryReqId = useRef(0);
+
+  // Map view
   const [mapRestaurants, setMapRestaurants] = useState<Restaurant[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
+
+  // Auth modal
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [feedFilter, setFeedFilter] = useState<FeedFilter>("all");
-  const [featuredRestaurants, setFeaturedRestaurants] = useState<Restaurant[]>(
-    [],
-  );
-  const [featuredLoading, setFeaturedLoading] = useState(true);
-  const [featuredError, setFeaturedError] = useState<string | null>(null);
-  const [restaurantStats, setRestaurantStats] = useState<RestaurantStats | null>(
-    null,
-  );
-  const [explorerRestaurants, setExplorerRestaurants] = useState<Restaurant[]>(
-    [],
-  );
-  const [explorerLoading, setExplorerLoading] = useState(false);
-  const [explorerError, setExplorerError] = useState<string | null>(null);
-  const [explorerPrefs, setExplorerPrefs] = useState<ExplorerPreferences>(() =>
-    loadJsonState("cdm-explorer-prefs", DEFAULT_EXPLORER_PREFS),
-  );
-  const [mapFilters, setMapFilters] = useState<MapFilters>(() =>
-    loadJsonState("cdm-map-filters", DEFAULT_MAP_FILTERS),
-  );
+  const [authForm, setAuthForm] = useState({
+    email: "",
+    password: "",
+    username: "",
+  });
 
-  // Evite que des réponses "anciennes" (requêtes lentes) écrasent le state récent.
-  const loadRestaurantsReqId = React.useRef(0);
-  const loadWheelCountryReqId = React.useRef(0);
-  const didMountRef = React.useRef(false);
-
+  // Load feed restaurants
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
-    let active = true;
+    setFeedPage(1);
 
-    fetchStats()
-      .then((stats) => {
-        if (active) setRestaurantStats(stats);
-      })
-      .catch((err) => {
-        if (active) setRestaurantStats(null);
-      })
+    const loadFeed = async () => {
+      const reqId = ++loadFeedReqId.current;
+      setFeedLoading(true);
+      setFeedError(null);
 
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const applyLocalRatings = useCallback(
-    (list: Restaurant[]): Restaurant[] => {
-      return list;
-    },
-    [],
-  );
-
-  const loadRestaurants = useCallback(
-    async (opts?: { append?: boolean; page?: number }) => {
-      const reqId = ++loadRestaurantsReqId.current;
-      const effectivePage = opts?.page ?? 1;
-      const isAppend = Boolean(opts?.append);
-      if (isAppend) setLoadingMore(true);
-      else setRestaurantsLoading(true);
-      setRestaurantsError(null);
       try {
-        const cuisineFilter = viewAllCountry
-          ? countryToCuisine(viewAllCountry)
+        const cuisineFilter = state.viewAllCountry
+          ? countryToCuisine(state.viewAllCountry)
           : undefined;
+
         const res = await fetchRestaurants({
-          page: effectivePage,
+          page: 1,
           limit: 20,
-          search: feedSearchQuery || undefined,
+          search: state.feedSearchQuery || undefined,
           cuisine: cuisineFilter,
           sortBy: "name",
           sortOrder: "asc",
         });
-        if (reqId !== loadRestaurantsReqId.current) return;
-        setTotalPages(res.meta.totalPages);
-        const next = applyLocalRatings(res.data);
-        setRestaurants((prev) => (isAppend ? [...prev, ...next] : next));
+
+        if (reqId === loadFeedReqId.current) {
+          setFeedTotalPages(res.meta.totalPages);
+          setFeedRestaurants(res.data);
+        }
       } catch (err) {
-        if (reqId === loadRestaurantsReqId.current) {
-          setRestaurantsError(
+        if (reqId === loadFeedReqId.current) {
+          setFeedError(
             err instanceof Error ? err.message : "Erreur de chargement",
           );
         }
       } finally {
-        if (reqId === loadRestaurantsReqId.current) {
-          if (isAppend) setLoadingMore(false);
-          else setRestaurantsLoading(false);
+        if (reqId === loadFeedReqId.current) {
+          setFeedLoading(false);
         }
       }
-    },
-    [applyLocalRatings, feedSearchQuery, viewAllCountry],
-  );
-
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabaseBrowserClient();
-
-    const toSessionUser = async (
-      sessionUser: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null | undefined,
-    ): Promise<SessionUser | null> => {
-      if (!sessionUser) return null;
-      const username =
-        (sessionUser.user_metadata?.username as string | undefined) ||
-        sessionUser.email?.split("@")[0] ||
-        "user";
-      let isAdmin = false;
-      try {
-        const res = await fetch("/api/auth/me");
-        if (res.ok) {
-          const me = (await res.json()) as { isAdmin?: boolean };
-          isAdmin = Boolean(me.isAdmin);
-        }
-      } catch {
-        // ignore
-      }
-      return {
-        id: sessionUser.id,
-        email: sessionUser.email || "",
-        username,
-        isAdmin,
-      };
     };
 
-    const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      const sessionUser = await toSessionUser(data.session?.user);
-      setUser(sessionUser);
-    };
-    void init();
+    void loadFeed();
+  }, [state.feedSearchQuery, state.viewAllCountry]);
 
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        const sessionUser = await toSessionUser(session?.user);
-        setUser(sessionUser);
-      },
-    );
-
-    return () => {
-      sub.subscription.unsubscribe();
-    };
-  }, []);
-
-  // Recharge la liste quand les filtres changent.
-  // IMPORTANT : on ne refetch pas quand `user` arrive, pour éviter un double fetch.
+  // Load explorer restaurants
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    setPage(1);
-    void loadRestaurants({ page: 1 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feedSearchQuery, viewAllCountry, loadRestaurants]);
-
-  // Quand l'utilisateur change (login/logout), on applique juste les ratings côté client.
-  useEffect(() => {
-    if (restaurants.length === 0) return;
-    setRestaurants((prev) => applyLocalRatings(prev));
-  }, [applyLocalRatings]); 
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("cdm-explorer-prefs", JSON.stringify(explorerPrefs));
-    } catch {
-      // ignore
-    }
-  }, [explorerPrefs]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("cdm-map-filters", JSON.stringify(mapFilters));
-    } catch {
-      // ignore
-    }
-  }, [mapFilters]);
-
-  // Cuisines complètes pour la roue (section accueil + onglet dédié).
-  useEffect(() => {
-    let active = true;
-    setWheelLoading(true);
-    setWheelError(null);
-    fetchCuisines()
-      .then((slugs) => {
-        if (!active) return;
-        setWheelCountries(
-          Array.from(new Set(slugs.map((s) => cuisineToCountry(s)))).sort(),
-        );
-      })
-      .catch((err) => {
-        if (active) {
-          setWheelError(
-            err instanceof Error ? err.message : "Erreur de chargement",
-          );
-          setWheelCountries([]);
-        }
-      })
-      .finally(() => {
-        if (active) setWheelLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // Données carte : charge tous les restos actifs à l'ouverture de l'onglet.
-  useEffect(() => {
-    if (currentView !== "map") return;
-    let active = true;
-    setMapLoading(true);
-    // Limite réduite pour accélérer le chargement de la carte.
-    fetchRestaurants({ limit: 200, sortBy: "name", sortOrder: "asc" })
-      .then((res) => {
-        if (active) setMapRestaurants(applyLocalRatings(res.data));
-      })
-      .catch(() => {
-        if (active) setMapRestaurants([]);
-      })
-      .finally(() => {
-        if (active) setMapLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [currentView, applyLocalRatings]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    let active = true;
-    setFeaturedLoading(true);
-    setFeaturedError(null);
-    fetchRestaurants({ limit: 60, sortBy: "rating", sortOrder: "desc" })
-      .then((res) => {
-        if (active) setFeaturedRestaurants(applyLocalRatings(res.data));
-      })
-      .catch((err) => {
-        if (active) {
-          setFeaturedError(
-            err instanceof Error ? err.message : "Erreur de chargement",
-          );
-        }
-      })
-      .finally(() => {
-        if (active) setFeaturedLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [applyLocalRatings]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    if (currentView !== "spin") return;
+    if (!isSupabaseConfigured() || state.currentView !== "spin") return;
     let active = true;
     setExplorerLoading(true);
     setExplorerError(null);
+
     fetchRestaurants({ limit: 100, sortBy: "rating", sortOrder: "desc" })
       .then((res) => {
-        if (active) setExplorerRestaurants(applyLocalRatings(res.data));
+        if (active) setExplorerRestaurants(res.data);
       })
       .catch((err) => {
         if (active) {
@@ -432,14 +221,20 @@ const CircleApp: React.FC = () => {
       .finally(() => {
         if (active) setExplorerLoading(false);
       });
+
     return () => {
       active = false;
     };
-  }, [currentView, applyLocalRatings]);
+  }, [state.currentView]);
 
+  // Load wheel country restaurants
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    if (currentView !== "wheel-result" || !wheelCountry) return;
+    if (
+      !isSupabaseConfigured() ||
+      state.currentView !== "wheel-result" ||
+      !state.wheelCountry
+    )
+      return;
 
     let active = true;
     const reqId = ++loadWheelCountryReqId.current;
@@ -448,13 +243,13 @@ const CircleApp: React.FC = () => {
 
     fetchRestaurants({
       limit: 100,
-      cuisine: countryToCuisine(wheelCountry),
+      cuisine: countryToCuisine(state.wheelCountry),
       sortBy: "rating",
       sortOrder: "desc",
     })
       .then((res) => {
         if (active && reqId === loadWheelCountryReqId.current) {
-          setWheelCountryRestaurants(applyLocalRatings(res.data));
+          setWheelCountryRestaurants(res.data);
         }
       })
       .catch((err) => {
@@ -473,176 +268,92 @@ const CircleApp: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [currentView, wheelCountry, applyLocalRatings]);
+  }, [state.currentView, state.wheelCountry]);
 
-  const canLoadMore = page < totalPages;
-  const initialFeedLoading = restaurantsLoading && restaurants.length === 0;
+  // Load map restaurants
+  useEffect(() => {
+    if (state.currentView !== "map") return;
+    let active = true;
+    setMapLoading(true);
 
-  const handleLoadMore = useCallback(async () => {
-    if (restaurantsLoading || loadingMore || !canLoadMore) return;
-    const nextPage = page + 1;
-    setPage(nextPage);
-    await loadRestaurants({ append: true, page: nextPage });
-  }, [
-    restaurantsLoading,
-    loadingMore,
-    canLoadMore,
-    page,
-    loadRestaurants,
-  ]);
+    fetchRestaurants({ limit: 200, sortBy: "name", sortOrder: "asc" })
+      .then((res) => {
+        if (active) setMapRestaurants(res.data);
+      })
+      .catch(() => {
+        if (active) setMapRestaurants([]);
+      })
+      .finally(() => {
+        if (active) setMapLoading(false);
+      });
 
+    return () => {
+      active = false;
+    };
+  }, [state.currentView]);
+
+  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (ratingTarget) setRatingTarget(null);
-      if (authOpen) setAuthOpen(false);
+      if (state.ratingTarget) setRatingTarget(null);
+      if (state.authOpen) setAuthOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ratingTarget, authOpen]);
+  }, [state.ratingTarget, state.authOpen]);
 
-  const handleLogout = () => {
-    const supabase = getSupabaseBrowserClient();
-    setUser(null);
-    void supabase.auth.signOut();
+  // Mobile nav scroll lock
+  useEffect(() => {
+    if (!state.mobileNavOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileNavOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [state.mobileNavOpen]);
+
+  // Scroll to top on view change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [state.currentView, state.viewAllCountry, state.wheelCountry]);
+
+  // Handlers
+  const handleLogout = useCallback(() => {
+    logout();
     setCurrentView("feed");
     setViewAllCountry(null);
-  };
+  }, [logout]);
 
-  const handleRateSuccess = (restaurantId: string, rating: number) => {
-    const update = (list: Restaurant[]) =>
-      list.map((res) => (res.id === restaurantId ? { ...res, rating } : res));
-    setRestaurants(update);
-    setFeaturedRestaurants(update);
-    setExplorerRestaurants(update);
-    setMapRestaurants(update);
-    setWheelCountryRestaurants(update);
-  };
-
-  const countries = wheelCountries.length
-    ? wheelCountries
-    : Array.from(new Set(restaurants.map((r) => r.country))).sort();
-
-  const cuisineOptions = useMemo(
-    () => Array.from(new Set([...countries, ...featuredRestaurants.map((r) => r.country)])).sort(),
-    [countries, featuredRestaurants],
+  const handleRateSuccess = useCallback(
+    (restaurantId: string, rating: number) => {
+      const update = (list: Restaurant[]) =>
+        list.map((res) => (res.id === restaurantId ? { ...res, rating } : res));
+      setFeedRestaurants(update);
+      setExplorerRestaurants(update);
+      setWheelCountryRestaurants(update);
+      setMapRestaurants(update);
+    },
+    [],
   );
 
-  const filteredRestaurants = useMemo(() => {
-    return restaurants.filter((restaurant) => {
-      if (feedFilter === "top") {
-        return (restaurant.rating ?? 0) >= 4.2;
+  const requireAuth = useCallback(
+    (action: () => void) => {
+      if (!user) {
+        setAuthOpen(true);
+        return;
       }
-      if (feedFilter === "reviews") {
-        return (restaurant.friendRatings?.length ?? 0) > 0;
-      }
-      if (feedFilter === "website") {
-        return Boolean(restaurant.website);
-      }
-      return true;
-    });
-  }, [feedFilter, restaurants]);
-
-  const hideRecommendedSection =
-    Boolean(feedSearchQuery.trim()) || feedFilter !== "all" || Boolean(viewAllCountry);
-
-  const favoriteCountries = useMemo(() => {
-    const matches = featuredRestaurants.filter((restaurant) => (restaurant.rating ?? 0) >= 4.2);
-    return new Set(matches.map((restaurant) => restaurant.country));
-  }, [featuredRestaurants]);
-
-  const recommendedRestaurants = useMemo(() => {
-    const pool = featuredRestaurants.length > 0 ? featuredRestaurants : restaurants;
-    return [...pool]
-      .sort(
-        (a, b) =>
-          scoreRestaurantForRecommendations(b, {
-            favoriteCountries,
-          }) -
-          scoreRestaurantForRecommendations(a, {
-            favoriteCountries,
-          }),
-      )
-      .slice(0, 6);
-  }, [favoriteCountries, featuredRestaurants, restaurants]);
-
-  const explorerResults = useMemo(() => {
-    const pool = explorerRestaurants.length > 0 ? explorerRestaurants : featuredRestaurants;
-    const search = explorerSearchQuery.trim().toLowerCase();
-    const matches = pool.filter((restaurant) => {
-      if (search) {
-        const haystack = [
-          restaurant.name,
-          restaurant.country,
-          restaurant.specialty,
-          restaurant.address,
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(search)) return false;
-      }
-      if (explorerPrefs.cuisine && restaurant.country !== explorerPrefs.cuisine) {
-        return false;
-      }
-      if ((restaurant.rating ?? 0) < explorerPrefs.minRating) return false;
-      if (explorerPrefs.hasWebsite && !restaurant.website) return false;
-      return true;
-    });
-
-    const sorters: Record<ExplorerSort, (a: Restaurant, b: Restaurant) => number> = {
-      recommended: (a, b) =>
-        scoreRestaurantForRecommendations(b, {
-          favoriteCountries,
-        }) -
-        scoreRestaurantForRecommendations(a, {
-          favoriteCountries,
-        }),
-      rating: (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
-      newest: (a, b) => Number(b.id) - Number(a.id),
-      distance: (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
-    };
-
-    const sortBy = explorerPrefs.sortBy === "distance" ? "recommended" : explorerPrefs.sortBy;
-    return matches.sort(sorters[sortBy]);
-  }, [
-    explorerSearchQuery,
-    explorerPrefs,
-    explorerRestaurants,
-    featuredRestaurants,
-    favoriteCountries,
-  ]);
-
-  const mapDisplayRestaurants = useMemo(() => {
-    const base = mapRestaurants.filter((restaurant) => {
-      if (mapFilters.cuisine && restaurant.country !== mapFilters.cuisine) {
-        return false;
-      }
-      if ((restaurant.rating ?? 0) < mapFilters.minRating) return false;
-      return true;
-    });
-
-    const sorters: Record<MapFilters["sortBy"], (a: Restaurant, b: Restaurant) => number> = {
-      recommended: (a, b) =>
-        scoreRestaurantForRecommendations(b, { favoriteCountries }) -
-        scoreRestaurantForRecommendations(a, { favoriteCountries }),
-      rating: (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
-      popular: (a, b) =>
-        (b.friendRatings?.length ?? 0) - (a.friendRatings?.length ?? 0) ||
-        (b.rating ?? 0) - (a.rating ?? 0),
-      distance: (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
-    };
-
-    const sortBy = mapFilters.sortBy === "distance" ? "recommended" : mapFilters.sortBy;
-    return base.sort(sorters[sortBy]);
-  }, [favoriteCountries, mapFilters, mapRestaurants]);
-
-  const requireAuth = useCallback((action: () => void) => {
-    if (!user) {
-      setAuthOpen(true);
-      return;
-    }
-    action();
-  }, [user]);
+      action();
+    },
+    [user],
+  );
 
   const handleRateRequest = useCallback(
     (restaurant: Restaurant) => {
@@ -651,75 +362,58 @@ const CircleApp: React.FC = () => {
     [requireAuth],
   );
 
-  // Ordre des onglets : 0=Feed, 1=Map, 2=Explorer, 3=Roue, 4=AI, 5=You
-  const handleNav = (index: number) => {
-    setViewAllCountry(null);
-    setTargetProfile(null);
-    if (index === 0) {
-      setCurrentView("feed");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else if (index === 1) setCurrentView("map");
-    else if (index === 2) setCurrentView("spin");
-    else if (index === 3) setCurrentView("wheel");
-    else if (index === 4) setCurrentView("ai");
-    else if (index === 5) {
-      requireAuth(() => {
-        setTargetProfile({
-          name: user!.username,
-          avatar: avatarFor(user!.username),
+  const handleNav = useCallback(
+    (index: number) => {
+      setViewAllCountry(null);
+      setTargetProfile(null);
+      if (index === 0) {
+        setCurrentView("feed");
+      } else if (index === 1) {
+        setCurrentView("map");
+      } else if (index === 2) {
+        setCurrentView("spin");
+      } else if (index === 3) {
+        setCurrentView("wheel");
+      } else if (index === 4) {
+        setCurrentView("ai");
+      } else if (index === 5) {
+        requireAuth(() => {
+          setTargetProfile({
+            name: user!.username,
+            avatar: avatarFor(user!.username),
+          });
+          setCurrentView("profile");
         });
-        setCurrentView("profile");
-      });
-    }
-  };
+      }
+    },
+    [user, requireAuth],
+  );
 
-  const handleProfileView = (profile: { name: string; avatar: string }) => {
-    requireAuth(() => {
-      setTargetProfile(profile);
-      setCurrentView("profile");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-  };
-
-  const handleCountrySelect = (country: string) => {
+  const handleCountrySelect = useCallback((country: string) => {
     setViewAllCountry(country);
     setCurrentView("feed");
-    window.setTimeout(() => {
-      document.getElementById("explore")?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+      document.getElementById("explore")?.scrollIntoView({
+        behavior: "smooth",
+      });
     }, 150);
-  };
+  }, []);
 
-  const handleWheelResult = useCallback(
-    (country: string) => {
-      setViewAllCountry(null);
-      setWheelCountry(country);
-      setCurrentView("wheel-result");
+  const handleWheelResult = useCallback((country: string) => {
+    setViewAllCountry(null);
+    setWheelCountry(country);
+    setCurrentView("wheel-result");
+  }, []);
+
+  const handleProfileView = useCallback(
+    (profile: { name: string; avatar: string }) => {
+      requireAuth(() => {
+        setTargetProfile(profile);
+        setCurrentView("profile");
+      });
     },
-    [],
+    [requireAuth],
   );
-
-  const handleExplorerPrefsChange = useCallback(
-    (next: Partial<ExplorerPreferences>) => {
-      setExplorerPrefs((current) => ({ ...current, ...next }));
-    },
-    [],
-  );
-
-  const handleMapFiltersChange = useCallback(
-    (next: Partial<MapFilters>) => {
-      setMapFilters((current) => ({ ...current, ...next }));
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      return;
-    }
-
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [currentView, viewAllCountry, wheelCountry]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -727,7 +421,7 @@ const CircleApp: React.FC = () => {
     setAuthLoading(true);
     const supabase = getSupabaseBrowserClient();
     try {
-      if (authMode === "join") {
+      if (state.authMode === "join") {
         const { error } = await supabase.auth.signUp({
           email: authForm.email,
           password: authForm.password,
@@ -750,6 +444,116 @@ const CircleApp: React.FC = () => {
     }
   };
 
+  // Computed values
+  const countries = wheelCountries.length
+    ? wheelCountries
+    : Array.from(new Set(feedRestaurants.map((r) => r.country))).sort();
+
+  const cuisineOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([...countries, ...featuredRestaurants.map((r) => r.country)]),
+      ).sort(),
+    [countries, featuredRestaurants],
+  );
+
+  const filteredRestaurants = useMemo(
+    () => filterRestaurantsByFeedFilter(feedRestaurants, state.feedFilter),
+    [state.feedFilter, feedRestaurants],
+  );
+
+  const hideRecommendedSection =
+    Boolean(state.feedSearchQuery.trim()) ||
+    state.feedFilter !== "all" ||
+    Boolean(state.viewAllCountry);
+
+  const favoriteCountries = useMemo(() => {
+    const matches = featuredRestaurants.filter(
+      (restaurant) => (restaurant.rating ?? 0) >= 4.2,
+    );
+    return new Set(matches.map((restaurant) => restaurant.country));
+  }, [featuredRestaurants]);
+
+  const recommendedRestaurants = useMemo(() => {
+    const pool =
+      featuredRestaurants.length > 0 ? featuredRestaurants : feedRestaurants;
+    return [...pool]
+      .sort(
+        (a, b) =>
+          scoreRestaurantForRecommendations(b, { favoriteCountries }) -
+          scoreRestaurantForRecommendations(a, { favoriteCountries }),
+      )
+      .slice(0, 6);
+  }, [favoriteCountries, featuredRestaurants, feedRestaurants]);
+
+  const explorerResults = useMemo(
+    () =>
+      filterExplorerResults(
+        explorerRestaurants.length > 0
+          ? explorerRestaurants
+          : featuredRestaurants,
+        state.explorerSearchQuery,
+        explorerPrefs,
+        favoriteCountries,
+      ),
+    [
+      state.explorerSearchQuery,
+      explorerPrefs,
+      explorerRestaurants,
+      featuredRestaurants,
+      favoriteCountries,
+    ],
+  );
+
+  const mapDisplayRestaurants = useMemo(
+    () => filterMapRestaurants(mapRestaurants, mapFilters, favoriteCountries),
+    [favoriteCountries, mapFilters, mapRestaurants],
+  );
+
+  const initialFeedLoading = feedLoading && feedRestaurants.length === 0;
+  const canLoadMore = feedPage < feedTotalPages;
+
+  const handleLoadMore = useCallback(async () => {
+    if (feedLoading || feedLoadingMore || !canLoadMore) return;
+    const nextPage = feedPage + 1;
+    setFeedPage(nextPage);
+
+    const reqId = ++loadFeedReqId.current;
+    setFeedLoadingMore(true);
+
+    try {
+      const cuisineFilter = state.viewAllCountry
+        ? countryToCuisine(state.viewAllCountry)
+        : undefined;
+
+      const res = await fetchRestaurants({
+        page: nextPage,
+        limit: 20,
+        search: state.feedSearchQuery || undefined,
+        cuisine: cuisineFilter,
+        sortBy: "name",
+        sortOrder: "asc",
+      });
+
+      if (reqId === loadFeedReqId.current) {
+        setFeedRestaurants((prev) => [...prev, ...res.data]);
+      }
+    } finally {
+      if (reqId === loadFeedReqId.current) {
+        setFeedLoadingMore(false);
+      }
+    }
+  }, [
+    feedLoading,
+    feedLoadingMore,
+    canLoadMore,
+    feedPage,
+    state.viewAllCountry,
+    state.feedSearchQuery,
+  ]);
+
+  const isAtHome = state.currentView === "feed" && !state.viewAllCountry;
+
   const authFormContent = (
     <form onSubmit={handleLogin} className="space-y-6">
       {authError && (
@@ -757,7 +561,7 @@ const CircleApp: React.FC = () => {
           {authError}
         </div>
       )}
-      {authMode === "join" && (
+      {state.authMode === "join" && (
         <input
           required
           type="text"
@@ -774,9 +578,7 @@ const CircleApp: React.FC = () => {
         type="email"
         placeholder={t("auth.email")}
         value={authForm.email}
-        onChange={(e) =>
-          setAuthForm({ ...authForm, email: e.target.value })
-        }
+        onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
         className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
       />
       <input
@@ -784,9 +586,7 @@ const CircleApp: React.FC = () => {
         type="password"
         placeholder={t("auth.password")}
         value={authForm.password}
-        onChange={(e) =>
-          setAuthForm({ ...authForm, password: e.target.value })
-        }
+        onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
         className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
       />
       <button
@@ -796,7 +596,7 @@ const CircleApp: React.FC = () => {
       >
         {authLoading
           ? "..."
-          : authMode === "login"
+          : state.authMode === "login"
             ? t("auth.enter")
             : t("auth.join")}
       </button>
@@ -804,36 +604,15 @@ const CircleApp: React.FC = () => {
         <button
           type="button"
           onClick={() =>
-            setAuthMode(authMode === "join" ? "login" : "join")
+            setAuthMode(state.authMode === "join" ? "login" : "join")
           }
           className="text-[10px] font-black uppercase tracking-[0.4em] text-circle-frost/30 hover:text-circle-text transition-all"
         >
-          {authMode === "join" ? t("auth.toLogin") : t("auth.toJoin")}
+          {state.authMode === "join" ? t("auth.toLogin") : t("auth.toJoin")}
         </button>
       </div>
     </form>
   );
-
-  const isAtHome = currentView === "feed" && !viewAllCountry;
-
-  useEffect(() => {
-    if (!mobileNavOpen) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMobileNavOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [mobileNavOpen]);
 
   if (!isSupabaseConfigured()) {
     return (
@@ -846,7 +625,7 @@ const CircleApp: React.FC = () => {
             {t("setup.intro")}
           </p>
           <pre className="bg-circle-bg border border-circle-border rounded-2xl p-4 text-xs text-circle-frost/80 overflow-x-auto">
-{`NEXT_PUBLIC_SUPABASE_URL="https://<ref>.supabase.co"
+            {`NEXT_PUBLIC_SUPABASE_URL="https://<ref>.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
 SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
           </pre>
@@ -882,8 +661,12 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
         <div className="flex items-center gap-2 md:gap-4">
           <div className="hidden lg:flex items-center gap-4">
-              <GooeyNav
-              key={currentView === "wheel-result" ? "wheel" : currentView}
+            <GooeyNav
+              key={
+                state.currentView === "wheel-result"
+                  ? "wheel"
+                  : state.currentView
+              }
               items={[
                 { label: t("nav.feed"), href: "#" },
                 { label: t("nav.map"), href: "#" },
@@ -894,19 +677,19 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               ]}
               onNav={handleNav}
               initialActiveIndex={
-                currentView === "feed"
+                state.currentView === "feed"
                   ? 0
-                  : currentView === "map"
+                  : state.currentView === "map"
                     ? 1
-                    : currentView === "spin"
+                    : state.currentView === "spin"
                       ? 2
-                      : currentView === "wheel"
+                      : state.currentView === "wheel"
                         ? 3
-                  : currentView === "wheel-result"
-                    ? 3
-                    : currentView === "ai"
-                      ? 4
-                      : 5
+                        : state.currentView === "wheel-result"
+                          ? 3
+                          : state.currentView === "ai"
+                            ? 4
+                            : 5
               }
             />
             {user?.isAdmin && (
@@ -942,17 +725,19 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
           <button
             type="button"
             className="lg:hidden inline-flex items-center justify-center h-11 w-11 rounded-2xl border border-circle-border bg-circle-card/80 text-circle-text/80 hover:text-circle-amber hover:border-circle-amber/60 transition-all"
-            aria-label={mobileNavOpen ? "Fermer le menu" : "Ouvrir le menu"}
-            aria-expanded={mobileNavOpen}
-            onClick={() => setMobileNavOpen((value) => !value)}
+            aria-label={
+              state.mobileNavOpen ? "Fermer le menu" : "Ouvrir le menu"
+            }
+            aria-expanded={state.mobileNavOpen}
+            onClick={() => setMobileNavOpen(!state.mobileNavOpen)}
           >
-            {mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+            {state.mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </nav>
 
       <AnimatePresence>
-        {mobileNavOpen && (
+        {state.mobileNavOpen && (
           <>
             <motion.button
               type="button"
@@ -999,14 +784,14 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   { label: t("nav.you"), index: 5 },
                 ].map((item) => {
                   const active =
-                    (item.index === 0 && currentView === "feed") ||
-                    (item.index === 1 && currentView === "map") ||
-                    (item.index === 2 && currentView === "spin") ||
+                    (item.index === 0 && state.currentView === "feed") ||
+                    (item.index === 1 && state.currentView === "map") ||
+                    (item.index === 2 && state.currentView === "spin") ||
                     (item.index === 3 &&
-                      (currentView === "wheel" ||
-                        currentView === "wheel-result")) ||
-                    (item.index === 4 && currentView === "ai") ||
-                    (item.index === 5 && currentView === "profile");
+                      (state.currentView === "wheel" ||
+                        state.currentView === "wheel-result")) ||
+                    (item.index === 4 && state.currentView === "ai") ||
+                    (item.index === 5 && state.currentView === "profile");
 
                   return (
                     <button
@@ -1086,7 +871,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
       <main className="container mx-auto max-w-5xl pt-8 md:pt-16 pb-24 md:pb-32 px-4 md:px-8">
         <AnimatePresence mode="wait" initial={false}>
-          {currentView === "feed" && (
+          {state.currentView === "feed" && (
             <MDiv
               key="feed"
               initial={{ opacity: 0 }}
@@ -1094,13 +879,13 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               exit={{ opacity: 0 }}
               className="space-y-20 md:space-y-32"
             >
-              {!viewAllCountry && (
+              {!state.viewAllCountry && (
                 <>
                   <HomeHero
                     totalRestaurants={
                       restaurantStats?.total ??
                       featuredRestaurants.length ??
-                      restaurants.length
+                      feedRestaurants.length
                     }
                     recommendedCount={recommendedRestaurants.length}
                     cuisineCount={
@@ -1129,19 +914,21 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     <input
                       type="text"
                       placeholder={t("feed.search")}
-                      value={feedSearchDraft}
+                      value={state.feedSearchDraft}
                       onChange={(e) => setFeedSearchDraft(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === " " || e.key === "Enter") {
                           e.preventDefault();
-                          setFeedSearchQuery(feedSearchDraft.trim());
+                          setFeedSearchQuery(state.feedSearchDraft.trim());
                         }
                       }}
                       className="w-full pl-20 pr-32 py-8 bg-circle-card border border-circle-border rounded-[2.5rem] focus:border-circle-teal transition-all text-2xl font-black text-circle-text placeholder-circle-frost/10 uppercase tracking-widest outline-none"
                     />
                     <button
                       type="button"
-                      onClick={() => setFeedSearchQuery(feedSearchDraft.trim())}
+                      onClick={() =>
+                        setFeedSearchQuery(state.feedSearchDraft.trim())
+                      }
                       className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full border border-circle-border bg-circle-bg/70 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-text/70 hover:text-circle-amber transition-colors"
                     >
                       Go
@@ -1160,12 +947,14 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                         { key: "reviews", label: t("feed.filter.reviews") },
                         { key: "website", label: t("feed.filter.website") },
                       ].map((item) => {
-                        const active = feedFilter === item.key;
+                        const active = state.feedFilter === item.key;
                         return (
                           <button
                             key={item.key}
                             type="button"
-                            onClick={() => setFeedFilter(item.key as FeedFilter)}
+                            onClick={() =>
+                              setFeedFilter(item.key as FeedFilter)
+                            }
                             className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
                               active
                                 ? "border-circle-amber/50 bg-circle-amber text-[#081c1b]"
@@ -1180,7 +969,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   </div>
                 </div>
 
-              <section className="space-y-5">
+                <section className="space-y-5">
                   {!hideRecommendedSection && (
                     <div className="flex items-end justify-between gap-4">
                       <div>
@@ -1204,11 +993,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   {!hideRecommendedSection &&
                     (featuredLoading ? (
                       <RestaurantListSkeleton count={3} />
-                    ) : featuredError ? (
-                      <p className="text-center text-red-300 font-bold py-16">
-                        {featuredError}
-                      </p>
-                    ) : recommendedRestaurants.length === 0 ? (
+                    ) : featuredRestaurants.length === 0 ? (
                       <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-16">
                         {t("feed.empty")}
                       </p>
@@ -1227,14 +1012,14 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               </div>
 
               <section id="explore" className="space-y-10">
-                {viewAllCountry && (
+                {state.viewAllCountry && (
                   <div className="flex justify-center">
                     <button
                       type="button"
                       onClick={() => setViewAllCountry(null)}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-circle-amber/10 border border-circle-amber/30 text-circle-amber font-black text-[10px] uppercase tracking-[0.3em] hover:bg-circle-amber/20 transition-colors"
                     >
-                      {t("feed.clearFilter", { cuisine: viewAllCountry })}
+                      {t("feed.clearFilter", { cuisine: state.viewAllCountry })}
                       <X size={14} />
                     </button>
                   </div>
@@ -1242,11 +1027,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
                 {initialFeedLoading ? (
                   <RestaurantListSkeleton count={4} />
-                ) : restaurantsError ? (
+                ) : feedError ? (
                   <p className="text-center text-red-300 font-bold py-24">
-                    {restaurantsError}
+                    {feedError}
                   </p>
-                ) : restaurants.length === 0 ? (
+                ) : feedRestaurants.length === 0 ? (
                   <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-24">
                     {t("feed.empty")}
                   </p>
@@ -1256,30 +1041,30 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     onRate={handleRateRequest}
                     onViewAll={handleCountrySelect}
                     onProfileClick={handleProfileView}
-                    isFiltered={!!viewAllCountry}
+                    isFiltered={!!state.viewAllCountry}
                   />
                 )}
 
-                {loadingMore && (
+                {feedLoadingMore && (
                   <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-8">
                     {t("feed.loadingMore")}
                   </p>
                 )}
 
                 {!initialFeedLoading &&
-                  !restaurantsError &&
-                  restaurants.length > 0 &&
+                  !feedError &&
+                  feedRestaurants.length > 0 &&
                   canLoadMore && (
                     <InfiniteScrollSentinel
                       onVisible={handleLoadMore}
-                      disabled={loadingMore || restaurantsLoading}
+                      disabled={feedLoadingMore || feedLoading}
                     />
                   )}
               </section>
             </MDiv>
           )}
 
-          {currentView === "spin" && (
+          {state.currentView === "spin" && (
             <MDiv
               key="spin"
               initial={{ opacity: 0, y: 20 }}
@@ -1299,137 +1084,145 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   </p>
                 </div>
 
-                  <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_1fr]">
-                    <label className="space-y-2 md:col-span-2">
-                      <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                        {t("feed.search")}
-                      </span>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={explorerSearchDraft}
-                          onChange={(e) => setExplorerSearchDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === " " || e.key === "Enter") {
-                              e.preventDefault();
-                              setExplorerSearchQuery(explorerSearchDraft.trim());
-                            }
-                          }}
-                          placeholder={t("feed.search")}
-                          className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setExplorerSearchQuery(explorerSearchDraft.trim())}
-                          className="rounded-2xl border border-circle-border bg-circle-card px-4 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/70 hover:text-circle-amber transition-colors"
-                        >
-                          Go
-                        </button>
-                      </div>
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                        Cuisine
-                      </span>
-                      <select
-                        value={explorerPrefs.cuisine}
-                        onChange={(e) =>
-                          handleExplorerPrefsChange({ cuisine: e.target.value })
-                        }
-                        className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
-                      >
-                        <option value="">{t("feed.filter.all")}</option>
-                        {cuisineOptions.map((country) => (
-                          <option key={country} value={country}>
-                            {country}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="space-y-2">
-                      <span className="flex items-center justify-between text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                        <span>Note min.</span>
-                        <span>{explorerPrefs.minRating.toFixed(1)}</span>
-                      </span>
+                <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_1fr]">
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                      {t("feed.search")}
+                    </span>
+                    <div className="flex gap-2">
                       <input
-                        type="range"
-                        min={0}
-                        max={5}
-                        step={0.5}
-                        value={explorerPrefs.minRating}
-                        onChange={(e) =>
-                          handleExplorerPrefsChange({
-                            minRating: Number(e.target.value),
-                          })
-                        }
-                        className="w-full accent-[#ff9f1c]"
-                      />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                        Tri
-                      </span>
-                      <select
-                        value={explorerPrefs.sortBy}
-                        onChange={(e) =>
-                          handleExplorerPrefsChange({
-                            sortBy: e.target.value as ExplorerSort,
-                          })
-                        }
+                        type="text"
+                        value={state.explorerSearchDraft}
+                        onChange={(e) => setExplorerSearchDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === " " || e.key === "Enter") {
+                            e.preventDefault();
+                            setExplorerSearchQuery(
+                              state.explorerSearchDraft.trim(),
+                            );
+                          }
+                        }}
+                        placeholder={t("feed.search")}
                         className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExplorerSearchQuery(
+                            state.explorerSearchDraft.trim(),
+                          )
+                        }
+                        className="rounded-2xl border border-circle-border bg-circle-card px-4 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/70 hover:text-circle-amber transition-colors"
                       >
-                        <option value="recommended">{t("feed.recommended")}</option>
-                        <option value="rating">{t("feed.filter.top")}</option>
-                        <option value="newest">Nouveautés</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleExplorerPrefsChange({
-                          hasWebsite: !explorerPrefs.hasWebsite,
+                        Go
+                      </button>
+                    </div>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                      Cuisine
+                    </span>
+                    <select
+                      value={explorerPrefs.cuisine}
+                      onChange={(e) =>
+                        updateExplorerPrefs({ cuisine: e.target.value })
+                      }
+                      className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
+                    >
+                      <option value="">{t("feed.filter.all")}</option>
+                      {cuisineOptions.map((country) => (
+                        <option key={country} value={country}>
+                          {country}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="flex items-center justify-between text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                      <span>Note min.</span>
+                      <span>{explorerPrefs.minRating.toFixed(1)}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={5}
+                      step={0.5}
+                      value={explorerPrefs.minRating}
+                      onChange={(e) =>
+                        updateExplorerPrefs({
+                          minRating: Number(e.target.value),
                         })
                       }
-                      className={`rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
-                        explorerPrefs.hasWebsite
-                          ? "border-circle-amber/50 bg-circle-amber text-[#081c1b]"
-                          : "border-circle-border bg-circle-bg/60 text-circle-frost/60"
-                      }`}
-                    >
-                      Site web
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setExplorerPrefs(DEFAULT_EXPLORER_PREFS)}
-                      className="rounded-full border border-circle-border bg-circle-bg/60 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/60"
-                    >
-                      {t("feed.filter.reset")}
-                    </button>
-                  </div>
-
-                  {explorerLoading ? (
-                    <RestaurantListSkeleton count={4} />
-                  ) : explorerError ? (
-                    <p className="text-center text-red-300 font-bold py-24">
-                      {explorerError}
-                    </p>
-                  ) : (
-                    <RestaurantList
-                      restaurants={explorerResults}
-                      onRate={handleRateRequest}
-                      onViewAll={handleCountrySelect}
-                      onProfileClick={handleProfileView}
-                      isFiltered
+                      className="w-full accent-[#ff9f1c]"
                     />
-                  )}
-                </section>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                      Tri
+                    </span>
+                    <select
+                      value={explorerPrefs.sortBy}
+                      onChange={(e) =>
+                        updateExplorerPrefs({
+                          sortBy: e.target.value as ExplorerSort,
+                        })
+                      }
+                      className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
+                    >
+                      <option value="recommended">
+                        {t("feed.recommended")}
+                      </option>
+                      <option value="rating">{t("feed.filter.top")}</option>
+                      <option value="newest">Nouveautés</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateExplorerPrefs({
+                        hasWebsite: !explorerPrefs.hasWebsite,
+                      })
+                    }
+                    className={`rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
+                      explorerPrefs.hasWebsite
+                        ? "border-circle-amber/50 bg-circle-amber text-[#081c1b]"
+                        : "border-circle-border bg-circle-bg/60 text-circle-frost/60"
+                    }`}
+                  >
+                    Site web
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetExplorerPrefs}
+                    className="rounded-full border border-circle-border bg-circle-bg/60 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/60"
+                  >
+                    {t("feed.filter.reset")}
+                  </button>
+                </div>
+
+                {explorerLoading ? (
+                  <RestaurantListSkeleton count={4} />
+                ) : explorerError ? (
+                  <p className="text-center text-red-300 font-bold py-24">
+                    {explorerError}
+                  </p>
+                ) : (
+                  <RestaurantList
+                    restaurants={explorerResults}
+                    onRate={handleRateRequest}
+                    onViewAll={handleCountrySelect}
+                    onProfileClick={handleProfileView}
+                    isFiltered
+                  />
+                )}
+              </section>
             </MDiv>
           )}
 
-          {currentView === "wheel" && (
+          {state.currentView === "wheel" && (
             <MDiv
               key="wheel"
               initial={{ opacity: 0, y: 20 }}
@@ -1451,10 +1244,6 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
                 {wheelLoading ? (
                   <RestaurantListSkeleton count={1} />
-                ) : wheelError ? (
-                  <p className="text-center text-red-300 font-bold py-24">
-                    {wheelError}
-                  </p>
                 ) : wheelCountries.length === 0 ? (
                   <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-24">
                     {t("home.empty")}
@@ -1471,7 +1260,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             </MDiv>
           )}
 
-          {currentView === "wheel-result" && wheelCountry && (
+          {state.currentView === "wheel-result" && state.wheelCountry && (
             <MDiv
               key="wheel-result"
               initial={{ opacity: 0, y: 20 }}
@@ -1479,7 +1268,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               exit={{ opacity: 0 }}
             >
               <WheelCountryView
-                country={wheelCountry}
+                country={state.wheelCountry}
                 restaurants={wheelCountryRestaurants}
                 loading={wheelCountryLoading}
                 error={wheelCountryError}
@@ -1495,7 +1284,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             </MDiv>
           )}
 
-          {currentView === "map" && (
+          {state.currentView === "map" && (
             <MDiv
               key="map"
               initial={{ opacity: 0, y: 20 }}
@@ -1506,12 +1295,12 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 onRate={handleRateRequest}
                 loading={mapLoading}
                 filters={mapFilters}
-                onFiltersChange={handleMapFiltersChange}
+                onFiltersChange={updateMapFilters}
               />
             </MDiv>
           )}
 
-          {currentView === "ai" && (
+          {state.currentView === "ai" && (
             <MDiv
               key="ai"
               initial={{ opacity: 0, y: 20 }}
@@ -1522,7 +1311,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             </MDiv>
           )}
 
-          {currentView === "profile" && targetProfile && (
+          {state.currentView === "profile" && state.targetProfile && (
             <MDiv
               key="profile"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -1530,8 +1319,8 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               exit={{ opacity: 0 }}
             >
               <ProfileView
-                profile={targetProfile}
-                restaurants={restaurants}
+                profile={state.targetProfile}
+                restaurants={feedRestaurants}
                 onBack={() => setCurrentView("feed")}
                 onRate={handleRateRequest}
                 onProfileClick={handleProfileView}
@@ -1554,7 +1343,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
       </footer>
 
       <AnimatePresence>
-        {authOpen && (
+        {state.authOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
             <MDiv
               initial={{ opacity: 0 }}
@@ -1581,7 +1370,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             </MDiv>
           </div>
         )}
-        {ratingTarget && (
+        {state.ratingTarget && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
             <MDiv
               initial={{ opacity: 0 }}
@@ -1600,12 +1389,12 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 {t("rate.title")}
               </h3>
               <p className="text-circle-frost/40 text-xs font-black mb-10 uppercase tracking-widest">
-                {ratingTarget.name}
+                {state.ratingTarget.name}
               </p>
               <StarRating
-                restaurantId={ratingTarget.id}
+                restaurantId={state.ratingTarget.id}
                 onRate={(val) => {
-                  handleRateSuccess(ratingTarget.id, val);
+                  handleRateSuccess(state.ratingTarget!.id, val);
                   setTimeout(() => setRatingTarget(null), 800);
                 }}
               />
