@@ -88,6 +88,11 @@ const fr: Dict = {
   "wheel.direction": "Direction",
   "wheel.spin": "Tourner la roue",
   "wheel.spinning": "Sélection...",
+  "wheel.resultsTitle": "Restaurants pour {country}",
+  "wheel.resultsLead": "La roue a choisi {country}. Voici les restaurants correspondants.",
+  "wheel.resultsCount": "{count} restaurant(s) trouvé(s)",
+  "wheel.back": "Retour à la roue",
+  "wheel.empty": "Aucun restaurant trouvé pour ce pays",
   // AI
   "ai.welcome":
     "Bonjour ! Je suis votre assistant culinaire nantais. Posez-moi vos questions sur les restaurants du cercle, ou demandez des recommandations à Nantes !",
@@ -208,6 +213,11 @@ const en: Dict = {
   "wheel.direction": "Heading to",
   "wheel.spin": "Spin the wheel",
   "wheel.spinning": "Selecting...",
+  "wheel.resultsTitle": "Restaurants in {country}",
+  "wheel.resultsLead": "The wheel picked {country}. Here are the matching restaurants.",
+  "wheel.resultsCount": "{count} restaurant(s) found",
+  "wheel.back": "Back to wheel",
+  "wheel.empty": "No restaurants found for this country",
   "ai.welcome":
     "Hi! I'm your Nantes culinary assistant. Ask me anything about the circle's restaurants, or for recommendations in Nantes!",
   "ai.title": "AI Research",

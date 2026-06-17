@@ -33,6 +33,7 @@ import RestaurantList from "./RestaurantList";
 import StarRating from "./StarRating";
 import GooeyNav from "./GooeyNav";
 import WheelOfFortune from "./WheelOfFortune";
+import WheelCountryView from "./WheelCountryView";
 import ProfileView from "./ProfileView";
 import AIResearch from "./AIResearch";
 import ThemeToggle from "./ThemeToggle";
@@ -58,7 +59,14 @@ const MapView = dynamic(() => import("./MapView"), {
 
 const MDiv = motion.div as any;
 
-type ViewMode = "feed" | "spin" | "wheel" | "map" | "profile" | "ai";
+type ViewMode =
+  | "feed"
+  | "spin"
+  | "wheel"
+  | "wheel-result"
+  | "map"
+  | "profile"
+  | "ai";
 type FeedFilter = "all" | "top" | "reviews" | "website";
 type ExplorerSort = "recommended" | "rating" | "distance" | "newest";
 
@@ -160,6 +168,14 @@ const CircleApp: React.FC = () => {
   const [wheelCountries, setWheelCountries] = useState<string[]>([]);
   const [wheelLoading, setWheelLoading] = useState(true);
   const [wheelError, setWheelError] = useState<string | null>(null);
+  const [wheelCountry, setWheelCountry] = useState<string | null>(null);
+  const [wheelCountryRestaurants, setWheelCountryRestaurants] = useState<
+    Restaurant[]
+  >([]);
+  const [wheelCountryLoading, setWheelCountryLoading] = useState(false);
+  const [wheelCountryError, setWheelCountryError] = useState<string | null>(
+    null,
+  );
   const [mapRestaurants, setMapRestaurants] = useState<Restaurant[]>([]);
   const [mapLoading, setMapLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -198,6 +214,7 @@ const CircleApp: React.FC = () => {
 
   // Evite que des réponses "anciennes" (requêtes lentes) écrasent le state récent.
   const loadRestaurantsReqId = React.useRef(0);
+  const loadWheelCountryReqId = React.useRef(0);
 
   const applyLocalRatings = useCallback(
     (list: Restaurant[], current: SessionUser | null): Restaurant[] => {
@@ -441,6 +458,44 @@ const CircleApp: React.FC = () => {
       active = false;
     };
   }, [currentView, user, applyLocalRatings]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    if (currentView !== "wheel-result" || !wheelCountry) return;
+
+    let active = true;
+    const reqId = ++loadWheelCountryReqId.current;
+    setWheelCountryLoading(true);
+    setWheelCountryError(null);
+
+    fetchRestaurants({
+      limit: 100,
+      cuisine: countryToCuisine(wheelCountry),
+      sortBy: "rating",
+      sortOrder: "desc",
+    })
+      .then((res) => {
+        if (active && reqId === loadWheelCountryReqId.current) {
+          setWheelCountryRestaurants(applyLocalRatings(res.data, user));
+        }
+      })
+      .catch((err) => {
+        if (active && reqId === loadWheelCountryReqId.current) {
+          setWheelCountryError(
+            err instanceof Error ? err.message : "Erreur de chargement",
+          );
+        }
+      })
+      .finally(() => {
+        if (active && reqId === loadWheelCountryReqId.current) {
+          setWheelCountryLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentView, wheelCountry, user, applyLocalRatings]);
 
   const canLoadMore = page < totalPages;
   const initialFeedLoading = restaurantsLoading && restaurants.length === 0;
@@ -735,9 +790,11 @@ const CircleApp: React.FC = () => {
 
   const handleWheelResult = useCallback(
     (country: string) => {
-      handleCountrySelect(country);
+      setViewAllCountry(null);
+      setWheelCountry(country);
+      setCurrentView("wheel-result");
     },
-    [handleCountrySelect],
+    [],
   );
 
   const requestLocation = useCallback(() => {
@@ -960,9 +1017,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       ? 2
                       : currentView === "wheel"
                         ? 3
-                        : currentView === "ai"
-                          ? 4
-                          : 5
+                  : currentView === "wheel-result"
+                    ? 3
+                    : currentView === "ai"
+                      ? 4
+                      : 5
               }
             />
             {user?.isAdmin && (
@@ -1058,7 +1117,9 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     (item.index === 0 && currentView === "feed") ||
                     (item.index === 1 && currentView === "map") ||
                     (item.index === 2 && currentView === "spin") ||
-                    (item.index === 3 && currentView === "wheel") ||
+                    (item.index === 3 &&
+                      (currentView === "wheel" ||
+                        currentView === "wheel-result")) ||
                     (item.index === 4 && currentView === "ai") ||
                     (item.index === 5 && currentView === "profile");
 
@@ -1543,6 +1604,30 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   />
                 )}
               </section>
+            </MDiv>
+          )}
+
+          {currentView === "wheel-result" && wheelCountry && (
+            <MDiv
+              key="wheel-result"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              <WheelCountryView
+                country={wheelCountry}
+                restaurants={wheelCountryRestaurants}
+                loading={wheelCountryLoading}
+                error={wheelCountryError}
+                onBack={() => {
+                  setWheelCountry(null);
+                  setWheelCountryRestaurants([]);
+                  setWheelCountryError(null);
+                  setCurrentView("wheel");
+                }}
+                onRate={handleRateRequest}
+                onProfileClick={handleProfileView}
+              />
             </MDiv>
           )}
 
