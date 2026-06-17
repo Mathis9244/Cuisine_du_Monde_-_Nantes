@@ -50,3 +50,19 @@ export async function fetchCuisines(): Promise<string[]> {
 export async function fetchRestaurant(id: string): Promise<Restaurant> {
   return getJson<Restaurant>(`/api/restaurants/${id}`);
 }
+
+export async function rateRestaurant(
+  id: string,
+  rating: number,
+): Promise<Restaurant> {
+  const res = await fetch(`/api/restaurants/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ rating }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Requête /api/restaurants/${id} échouée (${res.status}): ${body}`);
+  }
+  return res.json() as Promise<Restaurant>;
+}

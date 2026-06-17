@@ -77,17 +77,17 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center py-12 md:py-16 bg-circle-card border border-circle-border rounded-[3rem] shadow-2xl">
-      <div className="text-center mb-10 px-4">
-        <h3 className="text-2xl md:text-3xl font-black text-circle-text uppercase tracking-[0.2em]">
+    <div className="flex w-full max-w-[32rem] mx-auto flex-col items-center overflow-visible rounded-[3rem] border border-circle-border bg-circle-card px-4 py-8 shadow-2xl sm:px-6 sm:py-10 md:max-w-[36rem] md:py-12">
+      <div className="mb-7 text-center px-2 sm:mb-8">
+        <h3 className="text-2xl font-black uppercase tracking-[0.2em] text-circle-text md:text-3xl">
           {t("wheel.title")}
         </h3>
-        <p className="text-circle-frost/50 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] mt-2">
+        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/50 md:text-xs">
           {t("wheel.subtitle")}
         </p>
       </div>
 
-      <div className="relative w-[18rem] h-[18rem] sm:w-[22rem] sm:h-[22rem]">
+      <div className="relative w-[min(82vw,18rem)] aspect-square sm:w-[min(76vw,22rem)] lg:w-[min(66vw,24rem)]">
         {/* Curseur (haut) */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 z-40 w-9 h-9 text-circle-amber drop-shadow-[0_0_12px_rgba(255,159,28,0.6)]">
           <svg viewBox="0 0 24 24" fill="currentColor">
@@ -153,7 +153,7 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
         </MDiv>
       </div>
 
-      <div className="h-12 mt-8 flex items-center justify-center">
+      <div className="mt-6 flex h-12 items-center justify-center">
         {winner && (
           <MDiv
             initial={{ opacity: 0, scale: 0.8 }}
@@ -173,7 +173,7 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
       <button
         onClick={spinWheel}
         disabled={isSpinning || count === 0}
-        className={`mt-4 px-12 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.4em] shadow-2xl transition-all active:scale-95 flex items-center gap-3 ${
+        className={`mt-4 inline-flex items-center gap-3 rounded-2xl px-8 py-3 text-[11px] font-black uppercase tracking-[0.4em] shadow-2xl transition-all active:scale-95 sm:px-12 sm:py-4 ${
           isSpinning || count === 0
             ? "bg-circle-border text-circle-text/20 cursor-not-allowed"
             : "bg-circle-amber text-[#081c1b] hover:bg-circle-honey"

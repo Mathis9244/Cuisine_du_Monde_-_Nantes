@@ -67,15 +67,11 @@ export interface ExplorerFilters {
   cuisine: string;
   minRating: number;
   hasWebsite: boolean;
-  nearbyOnly: boolean;
-  maxDistanceKm: number;
   sortBy: SortMode;
 }
 
 export interface MapFilters {
   cuisine: string;
   minRating: number;
-  nearbyOnly: boolean;
-  maxDistanceKm: number;
   sortBy: "recommended" | "rating" | "distance" | "popular";
 }
