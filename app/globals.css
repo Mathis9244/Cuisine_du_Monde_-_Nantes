@@ -132,6 +132,10 @@ body {
   opacity: 0;
   transition: opacity 0.2s;
 }
+.gooey-nav-container[data-theme="light"] .effect.text,
+[data-theme="light"] .gooey-nav-container .effect.text {
+  color: rgb(var(--c-bg));
+}
 .gooey-nav-container .effect.text.active {
   opacity: 1;
 }
