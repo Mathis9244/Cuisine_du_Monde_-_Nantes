@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Star } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { rateRestaurant } from "@/lib/api";
 
 interface StarRatingProps {
   restaurantId: string;
@@ -26,29 +27,20 @@ const StarRating: React.FC<StarRatingProps> = ({ restaurantId, onRate }) => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(Boolean(session?.access_token));
     });
-
-    const savedRatings = localStorage.getItem("nwe-ratings-store");
-    if (savedRatings) {
-      const parsed = JSON.parse(savedRatings);
-      if (parsed[restaurantId]) {
-        setRating(parsed[restaurantId]);
-      }
-    }
     return () => {
       sub.subscription.unsubscribe();
     };
   }, [restaurantId]);
 
-  const handleRate = (val: number) => {
+  const handleRate = async (val: number) => {
     if (!isLoggedIn) return;
-
-    setRating(val);
-    const savedRatings = localStorage.getItem("nwe-ratings-store") || "{}";
-    const parsed = JSON.parse(savedRatings);
-    parsed[restaurantId] = val;
-    localStorage.setItem("nwe-ratings-store", JSON.stringify(parsed));
-
-    if (onRate) onRate(val);
+    try {
+      const updated = await rateRestaurant(restaurantId, val);
+      setRating(val);
+      if (onRate) onRate(updated.rating ?? val);
+    } catch {
+      // On garde l'UI stable si la persistance échoue.
+    }
   };
 
   return (

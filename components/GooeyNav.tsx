@@ -154,6 +154,7 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
     if (activeLi) {
       updateEffectPosition(activeLi);
       textRef.current?.classList.add("active");
+      requestAnimationFrame(() => updateEffectPosition(activeLi));
     }
 
     const resizeObserver = new ResizeObserver(() => {
@@ -161,7 +162,7 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
         activeIndex
       ] as HTMLElement;
       if (currentActiveLi) {
-        updateEffectPosition(currentActiveLi);
+        requestAnimationFrame(() => updateEffectPosition(currentActiveLi));
       }
     });
 
