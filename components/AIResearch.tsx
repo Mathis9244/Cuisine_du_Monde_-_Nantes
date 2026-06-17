@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Send, Bot, User, Loader2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import MarkdownContent from "./MarkdownContent";
 
 interface Message {
   id: string;
@@ -112,9 +113,13 @@ const AIResearch: React.FC = () => {
                   : "bg-circle-border/50 border border-circle-border text-circle-frost rounded-tl-none"
               }`}
             >
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                {msg.content}
-              </p>
+              {msg.role === "model" ? (
+                <MarkdownContent content={msg.content} />
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                  {msg.content}
+                </p>
+              )}
             </div>
           </motion.div>
         ))}
