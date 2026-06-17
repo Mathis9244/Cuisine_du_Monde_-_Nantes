@@ -32,6 +32,7 @@ import HomeHero from "./HomeHero";
 import RestaurantList from "./RestaurantList";
 import StarRating from "./StarRating";
 import GooeyNav from "./GooeyNav";
+import WheelOfFortune from "./WheelOfFortune";
 import ProfileView from "./ProfileView";
 import AIResearch from "./AIResearch";
 import ThemeToggle from "./ThemeToggle";
@@ -57,7 +58,7 @@ const MapView = dynamic(() => import("./MapView"), {
 
 const MDiv = motion.div as any;
 
-type ViewMode = "feed" | "spin" | "map" | "profile" | "ai";
+type ViewMode = "feed" | "spin" | "wheel" | "map" | "profile" | "ai";
 type FeedFilter = "all" | "top" | "reviews" | "website";
 type ExplorerSort = "recommended" | "rating" | "distance" | "newest";
 
@@ -343,7 +344,7 @@ const CircleApp: React.FC = () => {
     }
   }, [mapFilters]);
 
-  // Cuisines complètes pour la roue (section accueil + onglet Spin).
+  // Cuisines complètes pour la roue (section accueil + onglet dédié).
   useEffect(() => {
     let active = true;
     setWheelLoading(true);
@@ -694,7 +695,7 @@ const CircleApp: React.FC = () => {
     [requireAuth],
   );
 
-  // Ordre des onglets : 0=Feed, 1=Map, 2=Spin, 3=AI, 4=You
+  // Ordre des onglets : 0=Feed, 1=Map, 2=Explorer, 3=Roue, 4=AI, 5=You
   const handleNav = (index: number) => {
     setViewAllCountry(null);
     setTargetProfile(null);
@@ -703,8 +704,9 @@ const CircleApp: React.FC = () => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else if (index === 1) setCurrentView("map");
     else if (index === 2) setCurrentView("spin");
-    else if (index === 3) setCurrentView("ai");
-    else if (index === 4) {
+    else if (index === 3) setCurrentView("wheel");
+    else if (index === 4) setCurrentView("ai");
+    else if (index === 5) {
       requireAuth(() => {
         setTargetProfile({
           name: user!.username,
@@ -730,6 +732,13 @@ const CircleApp: React.FC = () => {
       document.getElementById("explore")?.scrollIntoView({ behavior: "smooth" });
     }, 150);
   };
+
+  const handleWheelResult = useCallback(
+    (country: string) => {
+      handleCountrySelect(country);
+    },
+    [handleCountrySelect],
+  );
 
   const requestLocation = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -932,11 +941,12 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
         <div className="flex items-center gap-2 md:gap-4">
           <div className="hidden lg:flex items-center gap-4">
-            <GooeyNav
+              <GooeyNav
               items={[
                 { label: t("nav.feed"), href: "#" },
                 { label: t("nav.map"), href: "#" },
                 { label: t("nav.spin"), href: "#" },
+                { label: t("nav.wheel"), href: "#" },
                 { label: t("nav.ai"), href: "#" },
                 { label: t("nav.you"), href: "#" },
               ]}
@@ -948,9 +958,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     ? 1
                     : currentView === "spin"
                       ? 2
-                      : currentView === "ai"
+                      : currentView === "wheel"
                         ? 3
-                        : 4
+                        : currentView === "ai"
+                          ? 4
+                          : 5
               }
             />
             {user?.isAdmin && (
@@ -1038,15 +1050,17 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   { label: t("nav.feed"), index: 0 },
                   { label: t("nav.map"), index: 1 },
                   { label: t("nav.spin"), index: 2 },
-                  { label: t("nav.ai"), index: 3 },
-                  { label: t("nav.you"), index: 4 },
+                  { label: t("nav.wheel"), index: 3 },
+                  { label: t("nav.ai"), index: 4 },
+                  { label: t("nav.you"), index: 5 },
                 ].map((item) => {
                   const active =
                     (item.index === 0 && currentView === "feed") ||
                     (item.index === 1 && currentView === "map") ||
                     (item.index === 2 && currentView === "spin") ||
-                    (item.index === 3 && currentView === "ai") ||
-                    (item.index === 4 && currentView === "profile");
+                    (item.index === 3 && currentView === "wheel") ||
+                    (item.index === 4 && currentView === "ai") ||
+                    (item.index === 5 && currentView === "profile");
 
                   return (
                     <button
@@ -1141,6 +1155,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     recommendedCount={recommendedRestaurants.length}
                     cuisineCount={countries.length}
                     onOpenExplorer={() => setCurrentView("spin")}
+                    onOpenWheel={() => setCurrentView("wheel")}
                     onOpenMap={() => setCurrentView("map")}
                     onJumpToSearch={() =>
                       document.getElementById("explore")?.scrollIntoView({
@@ -1485,6 +1500,46 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     onViewAll={handleCountrySelect}
                     onProfileClick={handleProfileView}
                     isFiltered
+                  />
+                )}
+              </section>
+            </MDiv>
+          )}
+
+          {currentView === "wheel" && (
+            <MDiv
+              key="wheel"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              <section className="space-y-8">
+                <div className="max-w-4xl mx-auto text-center space-y-4">
+                  <p className="text-[10px] uppercase tracking-[0.45em] font-black text-circle-frost/35">
+                    {t("nav.wheel")}
+                  </p>
+                  <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter">
+                    {t("wheel.title")}
+                  </h2>
+                  <p className="max-w-2xl mx-auto text-circle-frost/65">
+                    {t("wheel.subtitle")}
+                  </p>
+                </div>
+
+                {wheelLoading ? (
+                  <RestaurantListSkeleton count={1} />
+                ) : wheelError ? (
+                  <p className="text-center text-red-300 font-bold py-24">
+                    {wheelError}
+                  </p>
+                ) : wheelCountries.length === 0 ? (
+                  <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-24">
+                    {t("home.empty")}
+                  </p>
+                ) : (
+                  <WheelOfFortune
+                    segments={wheelCountries}
+                    onResult={handleWheelResult}
                   />
                 )}
               </section>

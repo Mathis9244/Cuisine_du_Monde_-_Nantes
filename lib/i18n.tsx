@@ -21,6 +21,7 @@ const fr: Dict = {
   "nav.feed": "Feed",
   "nav.map": "Carte",
   "nav.spin": "Explorer",
+  "nav.wheel": "Roue",
   "nav.ai": "IA",
   "nav.you": "Profil",
   "nav.home": "Accueil / Roulette",
@@ -48,6 +49,7 @@ const fr: Dict = {
     "Recherche rapide, carte à proximité et recommandations personnalisées pour aller droit au but.",
   "feed.heroPrimary": "Recherche avancée",
   "feed.heroSecondary": "Ouvrir la carte",
+  "feed.heroWheel": "Tourner la roue",
   "feed.heroTertiary": "Découvrir",
   "feed.recommended": "Recommandé pour vous",
   "feed.recommendedLead":
@@ -106,6 +108,7 @@ const fr: Dict = {
   "map.nearby": "Autour de moi",
   "map.filters": "Filtres carte",
   "map.radius": "Rayon",
+  "map.skin": "Skin carte",
   "map.reset": "Réinitialiser",
   // Home
   "home.subtitle": "Nantes · Le cercle des explorateurs culinaires",
@@ -145,6 +148,7 @@ const en: Dict = {
   "nav.feed": "Feed",
   "nav.map": "Map",
   "nav.spin": "Explore",
+  "nav.wheel": "Wheel",
   "nav.ai": "AI",
   "nav.you": "You",
   "nav.home": "Home / Wheel",
@@ -169,6 +173,7 @@ const en: Dict = {
     "Fast search, nearby map and personalized recommendations to get straight to the point.",
   "feed.heroPrimary": "Advanced search",
   "feed.heroSecondary": "Open map",
+  "feed.heroWheel": "Spin wheel",
   "feed.heroTertiary": "Discover",
   "feed.recommended": "Recommended for you",
   "feed.recommendedLead":
@@ -221,6 +226,7 @@ const en: Dict = {
   "map.nearby": "Near me",
   "map.filters": "Map filters",
   "map.radius": "Radius",
+  "map.skin": "Map skin",
   "map.reset": "Reset",
   "home.subtitle": "Nantes · The circle of culinary explorers",
   "home.lead":

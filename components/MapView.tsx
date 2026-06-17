@@ -15,6 +15,7 @@ import {
 import type { GeoPoint, MapFilters, Restaurant } from "@/lib/types";
 import { formatDistanceKm, haversineKm } from "@/lib/geo";
 import { useI18n } from "@/lib/i18n";
+import { useTheme } from "@/lib/theme";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -223,10 +224,18 @@ const MapView: React.FC<MapViewProps> = ({
   onFiltersChange,
 }) => {
   const { t } = useI18n();
+  const { resolved } = useTheme();
   const withCoords = restaurants.filter(
     (r) => r.latitude != null && r.longitude != null,
   );
   const center: [number, number] = [47.2184, -1.5536];
+  const mapSkin = resolved === "dark" ? "dark" : "voyager";
+  const tileUrl =
+    resolved === "dark"
+      ? "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+  const tileAttribution =
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
   const filtered = useMemo(() => {
     const base = withCoords.filter((restaurant) => {
@@ -312,6 +321,12 @@ const MapView: React.FC<MapViewProps> = ({
             <LocateFixed size={14} />
             {t("map.location")}
           </button>
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+          <span>{t("map.skin")}</span>
+          <span className="rounded-full border border-circle-border bg-circle-bg/70 px-3 py-1 text-circle-frost/60">
+            {mapSkin}
+          </span>
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
@@ -446,8 +461,8 @@ const MapView: React.FC<MapViewProps> = ({
             className="h-full w-full"
           >
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution={tileAttribution}
+              url={tileUrl}
             />
             <ClusteredMarkers
               restaurants={filtered}

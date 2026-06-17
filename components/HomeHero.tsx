@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArrowRight, MapPin, Search, Sparkles } from "lucide-react";
+import { ArrowRight, Compass, MapPin, Search, Sparkles } from "lucide-react";
 import { APP_NAME } from "@/lib/constants";
 import { useI18n } from "@/lib/i18n";
 
@@ -10,6 +10,7 @@ interface HomeHeroProps {
   recommendedCount: number;
   cuisineCount: number;
   onOpenExplorer: () => void;
+  onOpenWheel: () => void;
   onOpenMap: () => void;
   onJumpToSearch: () => void;
 }
@@ -19,6 +20,7 @@ const HomeHero: React.FC<HomeHeroProps> = ({
   recommendedCount,
   cuisineCount,
   onOpenExplorer,
+  onOpenWheel,
   onOpenMap,
   onJumpToSearch,
 }) => {
@@ -55,6 +57,14 @@ const HomeHero: React.FC<HomeHeroProps> = ({
             >
               <MapPin size={14} />
               {t("feed.heroSecondary")}
+            </button>
+            <button
+              type="button"
+              onClick={onOpenWheel}
+              className="inline-flex items-center gap-2 rounded-full border border-circle-border bg-circle-card px-5 py-3 text-[10px] md:text-xs font-black uppercase tracking-[0.35em] text-circle-frost/70 hover:text-circle-text transition-colors"
+            >
+              <Compass size={14} />
+              {t("feed.heroWheel")}
             </button>
             <button
               type="button"
