@@ -20,7 +20,7 @@ import type {
   Restaurant,
   FriendRating,
 } from "@/lib/types";
-import { fetchCuisines, fetchRestaurants } from "@/lib/api";
+import { fetchCuisines, fetchRestaurants, fetchStats } from "@/lib/api";
 import { APP_NAME } from "@/lib/constants";
 import { countryToCuisine, cuisineToCountry } from "@/lib/mappers";
 import { haversineKm } from "@/lib/geo";
@@ -41,6 +41,7 @@ import LanguageToggle from "./LanguageToggle";
 import InfiniteScrollSentinel from "./InfiniteScrollSentinel";
 import { RestaurantListSkeleton } from "./RestaurantCardSkeleton";
 import { useI18n } from "@/lib/i18n";
+import type { RestaurantStats } from "@/lib/types";
 
 function MapLoadingFallback() {
   const { t } = useI18n();
@@ -193,6 +194,9 @@ const CircleApp: React.FC = () => {
   );
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
+  const [restaurantStats, setRestaurantStats] = useState<RestaurantStats | null>(
+    null,
+  );
   const [explorerRestaurants, setExplorerRestaurants] = useState<Restaurant[]>(
     [],
   );
@@ -216,6 +220,23 @@ const CircleApp: React.FC = () => {
   const loadRestaurantsReqId = React.useRef(0);
   const loadWheelCountryReqId = React.useRef(0);
   const didMountRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+
+    fetchStats()
+      .then((stats) => {
+        if (active) setRestaurantStats(stats);
+      })
+      .catch((err) => {
+        if (active) setRestaurantStats(null);
+      })
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const applyLocalRatings = useCallback(
     (list: Restaurant[], current: SessionUser | null): Restaurant[] => {
@@ -1222,9 +1243,15 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               {!viewAllCountry && (
                 <>
                   <HomeHero
-                    totalRestaurants={featuredRestaurants.length || restaurants.length}
+                    totalRestaurants={
+                      restaurantStats?.total ??
+                      featuredRestaurants.length ??
+                      restaurants.length
+                    }
                     recommendedCount={recommendedRestaurants.length}
-                    cuisineCount={countries.length}
+                    cuisineCount={
+                      restaurantStats?.byCuisine.length ?? countries.length
+                    }
                     onOpenExplorer={() => setCurrentView("spin")}
                     onOpenWheel={() => setCurrentView("wheel")}
                     onOpenMap={() => setCurrentView("map")}
