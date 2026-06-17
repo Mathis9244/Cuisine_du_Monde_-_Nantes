@@ -845,7 +845,7 @@ const CircleApp: React.FC = () => {
     }
 
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [currentView]);
+  }, [currentView, viewAllCountry, wheelCountry]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
