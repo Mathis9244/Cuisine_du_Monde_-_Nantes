@@ -215,6 +215,7 @@ const CircleApp: React.FC = () => {
   // Evite que des réponses "anciennes" (requêtes lentes) écrasent le state récent.
   const loadRestaurantsReqId = React.useRef(0);
   const loadWheelCountryReqId = React.useRef(0);
+  const didMountRef = React.useRef(false);
 
   const applyLocalRatings = useCallback(
     (list: Restaurant[], current: SessionUser | null): Restaurant[] => {
@@ -836,6 +837,15 @@ const CircleApp: React.FC = () => {
     },
     [],
   );
+
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentView]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
