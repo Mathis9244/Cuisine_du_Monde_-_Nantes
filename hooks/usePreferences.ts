@@ -14,13 +14,13 @@ const DEFAULT_EXPLORER_PREFS: ExplorerPreferences = {
   cuisine: "",
   minRating: 0,
   hasWebsite: false,
-  sortBy: "recommended",
+  sortBy: "rating",
 };
 
 const DEFAULT_MAP_FILTERS: MapFilters = {
   cuisine: "",
   minRating: 0,
-  sortBy: "recommended",
+  sortBy: "rating",
 };
 
 function loadJsonState<T>(key: string, fallback: T): T {

@@ -43,7 +43,6 @@ import {
   ExplorerSort,
 } from "@/hooks";
 import {
-  scoreRestaurantForRecommendations,
   filterRestaurantsByFeedFilter,
   filterExplorerResults,
   filterMapRestaurants,
@@ -581,29 +580,12 @@ const CircleApp: React.FC = () => {
     [state.feedFilter, feedRestaurants],
   );
 
-  const hideRecommendedSection =
-    Boolean(state.feedSearchQuery.trim()) ||
-    state.feedFilter !== "all" ||
-    Boolean(state.viewAllCountry);
-
   const favoriteCountries = useMemo(() => {
     const matches = featuredRestaurants.filter(
       (restaurant) => (restaurant.rating ?? 0) >= 4.2,
     );
     return new Set(matches.map((restaurant) => restaurant.country));
   }, [featuredRestaurants]);
-
-  const recommendedRestaurants = useMemo(() => {
-    const pool =
-      featuredRestaurants.length > 0 ? featuredRestaurants : feedRestaurants;
-    return [...pool]
-      .sort(
-        (a, b) =>
-          scoreRestaurantForRecommendations(b, { favoriteCountries }) -
-          scoreRestaurantForRecommendations(a, { favoriteCountries }),
-      )
-      .slice(0, 6);
-  }, [favoriteCountries, featuredRestaurants, feedRestaurants]);
 
   const explorerResults = useMemo(
     () =>
@@ -1036,7 +1018,6 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       featuredRestaurants.length ??
                       feedRestaurants.length
                     }
-                    recommendedCount={recommendedRestaurants.length}
                     cuisineCount={
                       restaurantStats?.byCuisine.length ?? countries.length
                     }
@@ -1117,45 +1098,6 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     </div>
                   </div>
                 </div>
-
-                <section className="space-y-5">
-                  {!hideRecommendedSection && (
-                    <div className="flex items-end justify-between gap-4">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                          {t("feed.recommended")}
-                        </p>
-                        <h2 className="mt-2 text-2xl md:text-3xl font-black uppercase tracking-tighter">
-                          {t("feed.recommended")}
-                        </h2>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("spin")}
-                        className="hidden md:inline-flex items-center gap-2 rounded-full border border-circle-border bg-circle-card px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/60 hover:text-circle-text transition-colors"
-                      >
-                        {t("feed.heroPrimary")}
-                      </button>
-                    </div>
-                  )}
-
-                  {!hideRecommendedSection &&
-                    (featuredLoading ? (
-                      <RestaurantListSkeleton count={3} />
-                    ) : featuredRestaurants.length === 0 ? (
-                      <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-16">
-                        {t("feed.empty")}
-                      </p>
-                    ) : (
-                      <RestaurantList
-                        restaurants={recommendedRestaurants}
-                        onRate={handleRateRequest}
-                        onViewAll={handleCountrySelect}
-                        onProfileClick={handleProfileView}
-                        isFiltered
-                      />
-                    ))}
-                </section>
 
                 <div className="border-t border-circle-border" />
               </div>
@@ -1318,9 +1260,6 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       }
                       className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
                     >
-                      <option value="recommended">
-                        {t("feed.recommended")}
-                      </option>
                       <option value="rating">{t("feed.filter.top")}</option>
                       <option value="newest">Nouveautés</option>
                     </select>

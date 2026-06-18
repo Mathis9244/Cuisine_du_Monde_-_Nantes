@@ -316,7 +316,6 @@ const MapView: React.FC<MapViewProps> = ({
               }
               className="mt-2 w-full bg-transparent text-sm font-bold outline-none"
             >
-              <option value="recommended">{t("feed.recommended")}</option>
               <option value="rating">{t("feed.filter.top")}</option>
               <option value="popular">{t("map.popularity")}</option>
             </select>
@@ -330,7 +329,7 @@ const MapView: React.FC<MapViewProps> = ({
               onFiltersChange({
                 cuisine: "",
                 minRating: 0,
-                sortBy: "recommended",
+                sortBy: "rating",
               })
             }
             className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] border-circle-border bg-circle-card/70 text-circle-frost/60 hover:text-circle-text hover:border-circle-frost/30 transition-all"
