@@ -4,13 +4,26 @@ import { createSupabaseAdminClient } from "./supabase/admin";
 
 const ADMIN_ROLE = process.env.ADMIN_ROLE || "admin";
 
+/** Lit app_metadata / user_metadata à jour (pas seulement le JWT en cache). */
+async function hydrateUserFromAuth(user: User): Promise<User> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin.auth.admin.getUserById(user.id);
+    if (!error && data.user) return data.user;
+  } catch {
+    // SUPABASE_SERVICE_ROLE_KEY absente : on garde le JWT courant.
+  }
+  return user;
+}
+
 /** Récupère l'utilisateur Supabase courant côté serveur (ou null). */
 export async function getCurrentUser(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user;
+  if (!user) return null;
+  return hydrateUserFromAuth(user);
 }
 
 /**

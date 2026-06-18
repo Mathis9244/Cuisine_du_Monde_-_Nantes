@@ -18,12 +18,21 @@ create table if not exists public.restaurants (
   source      text,                 -- osm | google_maps | manual | csv
   source_id   text,
   is_active   boolean not null default true,
+  boost_until timestamptz,
+  boost_tier  smallint not null default 1,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
 
 create index if not exists restaurants_cuisine_idx on public.restaurants (cuisine);
 create index if not exists restaurants_is_active_idx on public.restaurants (is_active);
+create index if not exists restaurants_boost_until_idx
+  on public.restaurants (boost_until)
+  where boost_until is not null;
+
+-- Migration si la table existait déjà :
+-- alter table public.restaurants add column if not exists boost_until timestamptz;
+-- alter table public.restaurants add column if not exists boost_tier smallint not null default 1;
 
 -- Contrainte d'unicité utilisée par l'upsert du worker (scraper/)
 create unique index if not exists restaurants_source_unique
@@ -46,6 +55,10 @@ create trigger restaurants_set_updated_at
 
 -- =============================================================================
 -- RLS : lecture publique des restaurants actifs.
+-- Visibilité payante : boost pour les restaurants moins connus.
+-- boost_until : date de fin du coup de projecteur (null = pas de boost).
+-- boost_tier  : 1 = standard, 2 = premium (meilleur placement).
+-- Activation via l'admin après paiement (Stripe à brancher plus tard).
 -- Les écritures passent par la clé service role (côté serveur web / worker),
 -- qui contourne la RLS. Aucune policy d'écriture n'est donc nécessaire ici.
 -- =============================================================================
@@ -65,10 +78,13 @@ create policy "Lecture publique des restaurants actifs"
 -- Promouvoir un utilisateur en admin (remplacer l'email) :
 --
 --   update auth.users
---   set raw_app_meta_data = raw_app_meta_data || '{"role":"admin"}'::jsonb
---   where email = 'admin@cuisine-du-monde.local';
+--   set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
+--   where email = 'ton@email.com';
 --
--- L'utilisateur doit se reconnecter pour rafraîchir son token.
+-- Ou via le Dashboard : Authentication → Users → ⋮ → Edit user
+-- → App Metadata : {"role":"admin"}
+--
+-- Puis rafraîchir la page (l'app relit les métadonnées côté serveur).
 -- =============================================================================
 
 -- =============================================================================

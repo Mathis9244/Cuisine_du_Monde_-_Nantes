@@ -1,19 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  buildRestaurantUpdateRow,
+  normalizeDbRestaurantRow,
+} from "@/lib/restaurantDb";
 import type { DbRestaurant } from "@/lib/types";
-
-const EDITABLE_FIELDS = [
-  "name",
-  "rating",
-  "cuisine",
-  "address",
-  "city",
-  "latitude",
-  "longitude",
-  "website",
-  "phone",
-] as const;
 
 export async function GET(
   _request: Request,
@@ -41,7 +33,7 @@ export async function GET(
   if (!data) {
     return NextResponse.json({ error: "Restaurant introuvable" }, { status: 404 });
   }
-  return NextResponse.json(data);
+  return NextResponse.json(normalizeDbRestaurantRow(data));
 }
 
 export async function PUT(
@@ -60,9 +52,9 @@ export async function PUT(
   }
 
   const body = (await request.json()) as Partial<DbRestaurant>;
-  const update: Record<string, unknown> = {};
-  for (const field of EDITABLE_FIELDS) {
-    if (field in body) update[field] = body[field as keyof DbRestaurant];
+  const update = buildRestaurantUpdateRow(body);
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "Aucun champ à mettre à jour" }, { status: 400 });
   }
 
   const supabase = createSupabaseAdminClient();
@@ -74,5 +66,5 @@ export async function PUT(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  return NextResponse.json(normalizeDbRestaurantRow(data));
 }

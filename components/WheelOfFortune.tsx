@@ -31,10 +31,19 @@ function pointToXY(angleDeg: number, radius: number): [number, number] {
   return [CX + radius * Math.sin(rad), CY - radius * Math.cos(rad)];
 }
 
-function formatLabel(seg: string, count: number): string {
-  const max = count > 14 ? 6 : count > 10 ? 8 : count > 6 ? 10 : 14;
-  if (seg.length <= max) return seg;
-  return `${seg.slice(0, max - 1)}…`;
+function formatLabel(seg: string, maxChars: number): string {
+  if (seg.length <= maxChars) return seg;
+  if (maxChars <= 3) return seg.slice(0, maxChars);
+  return `${seg.slice(0, maxChars - 1)}…`;
+}
+
+function labelMetrics(count: number) {
+  const slice = count > 0 ? 360 / count : 360;
+  const labelRadius = R - (count > 20 ? 14 : count > 14 ? 12 : count > 8 ? 11 : 13);
+  const fontSize = Math.max(4.5, Math.min(9, 100 / Math.max(count, 1)));
+  const arcLen = (slice / 360) * 2 * Math.PI * labelRadius;
+  const maxChars = Math.max(3, Math.floor(arcLen / (fontSize * 0.62)) - 1);
+  return { labelRadius, fontSize, maxChars, slice };
 }
 
 const EXCLUDED_FILL = "#2a3a38";
@@ -65,10 +74,8 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
   );
 
   const count = segments.length;
-  const slice = count > 0 ? 360 / count : 360;
-
-  const labelFontSize = useMemo(
-    () => Math.max(6, Math.min(11, 130 / Math.max(count, 1))),
+  const { labelRadius, fontSize: labelFontSize, maxChars, slice } = useMemo(
+    () => labelMetrics(count),
     [count],
   );
 
@@ -136,7 +143,7 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
               void spinWheel();
             }
           }}
-          className={`relative aspect-square w-full touch-manipulation rounded-full outline-none transition-shadow ${
+          className={`relative aspect-square w-full touch-manipulation overflow-hidden rounded-full outline-none transition-shadow ${
             canSpin
               ? "cursor-pointer active:scale-[0.99]"
               : "cursor-not-allowed"
@@ -148,6 +155,13 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
             className="h-full w-full drop-shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
             aria-hidden
           >
+            <defs>
+              <clipPath id="wheel-disc-clip">
+                <circle cx={CX} cy={CY} r={R} />
+              </clipPath>
+            </defs>
+
+            <g clipPath="url(#wheel-disc-clip)">
             {/* Fond disque */}
             <circle cx={CX} cy={CY} r={R + 2} fill="#081c1b" />
 
@@ -162,7 +176,6 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
               const color = SLICE_COLORS[i % SLICE_COLORS.length];
 
               const mid = startAngle + slice / 2;
-              const labelRadius = count > 12 ? R * 0.68 : R * 0.72;
               const [lx, ly] = pointToXY(mid, labelRadius);
               let rot = mid - 90;
               if (rot > 90) rot -= 180;
@@ -182,11 +195,13 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
                     fontSize={labelFontSize}
                     fontWeight={800}
                     textAnchor="middle"
-                    dominantBaseline="central"
+                    dominantBaseline="middle"
                     className="select-none uppercase"
-                    style={{ letterSpacing: "0.04em" }}
+                    style={{
+                      letterSpacing: count > 14 ? "0.02em" : "0.04em",
+                    }}
                   >
-                    {formatLabel(seg, count)}
+                    {formatLabel(seg, maxChars)}
                   </text>
                 </g>
               );
@@ -220,8 +235,9 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
               stroke="rgba(255, 255, 255, 0.12)"
               strokeWidth={1}
             />
+            </g>
 
-            {/* Moyeu */}
+            {/* Moyeu (au-dessus du clip) */}
             <circle
               cx={CX}
               cy={CY}

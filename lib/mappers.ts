@@ -1,4 +1,5 @@
 import type { DbRestaurant, Restaurant } from "./types";
+import { isActiveSpotlight } from "./visibility";
 
 /** Slug de cuisine (anglais, comme stocké en base) -> pays affiché dans l'UI. */
 const CUISINE_TO_COUNTRY: Record<string, string> = {
@@ -89,9 +90,19 @@ export function toRestaurant(db: DbRestaurant): Restaurant {
     description:
       `${db.name} — cuisine ${cuisineLabel.toLowerCase()}${cityPart}.`.trim(),
     rating: db.rating ?? undefined,
-    website: db.website,
+    website: db.website ?? db.url ?? null,
     phone: db.phone,
     latitude: db.latitude,
     longitude: db.longitude,
+    boostUntil: db.boost_until ?? null,
+    boostTier: db.boost_tier ?? 1,
+  };
+}
+
+/** Recalcule le flag spotlight (après notes cercle). */
+export function applySpotlightFlag(restaurant: Restaurant): Restaurant {
+  return {
+    ...restaurant,
+    isSpotlight: isActiveSpotlight(restaurant),
   };
 }

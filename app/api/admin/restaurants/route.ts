@@ -1,8 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  buildRestaurantInsertRow,
+  normalizeDbRestaurantRow,
+} from "@/lib/restaurantDb";
 import type { DbRestaurant } from "@/lib/types";
-
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin();
   if ("error" in auth) {
@@ -39,7 +42,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    data: data as DbRestaurant[],
+    data: (data as DbRestaurant[]).map((row) => normalizeDbRestaurantRow(row)),
     meta: { total: count ?? 0, page, limit },
   });
 }
@@ -58,24 +61,12 @@ export async function POST(request: NextRequest) {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("restaurants")
-    .insert({
-      name: body.name,
-      rating: body.rating ?? null,
-      cuisine: body.cuisine ?? null,
-      address: body.address ?? null,
-      city: body.city ?? "Nantes",
-      latitude: body.latitude ?? null,
-      longitude: body.longitude ?? null,
-      website: body.website ?? null,
-      phone: body.phone ?? null,
-      source: body.source ?? "manual",
-      is_active: true,
-    })
+    .insert(buildRestaurantInsertRow(body))
     .select("*")
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json(normalizeDbRestaurantRow(data), { status: 201 });
 }

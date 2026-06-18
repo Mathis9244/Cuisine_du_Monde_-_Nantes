@@ -12,6 +12,10 @@ export interface RestaurantFilters {
   limit?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  minRating?: number;
+  hasWebsite?: boolean;
+  hasPhone?: boolean;
+  spotlight?: boolean;
 }
 
 async function getJson<T>(url: string): Promise<T> {
@@ -33,6 +37,12 @@ export async function fetchRestaurants(
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.sortBy) params.set("sortBy", filters.sortBy);
   if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
+  if (filters.minRating != null && filters.minRating > 0) {
+    params.set("minRating", String(filters.minRating));
+  }
+  if (filters.hasWebsite) params.set("hasWebsite", "true");
+  if (filters.hasPhone) params.set("hasPhone", "true");
+  if (filters.spotlight) params.set("spotlight", "true");
   const qs = params.toString();
   return getJson<Paginated<Restaurant>>(
     `/api/restaurants${qs ? `?${qs}` : ""}`,

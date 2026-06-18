@@ -41,10 +41,17 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
       whileHover={{ borderColor: "#2ec4b6" }}
       className="bg-circle-card rounded-[2rem] p-8 border border-circle-border transition-all flex flex-col group shadow-2xl"
     >
-      <div className="flex justify-between items-start mb-6">
-        <h4 className="text-4xl font-black text-circle-text tracking-tighter uppercase leading-none">
-          {restaurant.name}
-        </h4>
+      <div className="flex justify-between items-start mb-6 gap-3">
+        <div className="min-w-0 space-y-3">
+          {restaurant.isSpotlight && (
+            <span className="inline-flex items-center rounded-full border border-circle-teal/40 bg-circle-teal/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.25em] text-circle-teal">
+              {t("spotlight.sponsored")}
+            </span>
+          )}
+          <h4 className="text-4xl font-black text-circle-text tracking-tighter uppercase leading-none">
+            {restaurant.name}
+          </h4>
+        </div>
         <div className="flex items-center gap-1.5 bg-circle-bg border border-circle-border px-3 py-1.5 rounded-full">
           <Star size={14} fill="#ff9f1c" className="text-circle-amber" />
           <span className="text-sm font-black text-circle-text">{avgRating}</span>

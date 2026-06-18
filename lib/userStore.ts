@@ -1,5 +1,8 @@
 /** Stockage local des notes et préférences utilisateur (côté client). */
 
+import type { FriendRating, Restaurant } from "@/lib/types";
+import { applySpotlightFlag } from "@/lib/mappers";
+
 const RATINGS_KEY = "nwe-ratings-store";
 const EXCLUDED_KEY = "cdm-excluded-countries";
 
@@ -14,8 +17,56 @@ export function getRatingsStore(): Record<string, number> {
   }
 }
 
+export function setUserRating(restaurantId: string, rating: number): void {
+  if (typeof window === "undefined") return;
+  const store = getRatingsStore();
+  store[restaurantId] = rating;
+  localStorage.setItem(RATINGS_KEY, JSON.stringify(store));
+}
+
 export function getRatedRestaurantIds(): string[] {
   return Object.keys(getRatingsStore());
+}
+
+export type UserRatingContext = {
+  username: string;
+  avatarUrl: string;
+};
+
+export function mergeUserRating(
+  restaurant: Restaurant,
+  user: UserRatingContext | null,
+): Restaurant {
+  if (!user) return restaurant;
+
+  const storedRating = getRatingsStore()[restaurant.id];
+  const others = (restaurant.friendRatings || []).filter(
+    (fr) => fr.name !== user.username,
+  );
+
+  if (!storedRating) {
+    return others.length
+      ? { ...restaurant, friendRatings: others }
+      : { ...restaurant, friendRatings: undefined };
+  }
+
+  const mine: FriendRating = {
+    name: user.username,
+    avatar: user.avatarUrl,
+    rating: storedRating,
+  };
+
+  return { ...restaurant, friendRatings: [...others, mine] };
+}
+
+export function mergeUserRatings(
+  restaurants: Restaurant[],
+  user: UserRatingContext | null,
+): Restaurant[] {
+  const merged = user
+    ? restaurants.map((r) => mergeUserRating(r, user))
+    : restaurants;
+  return merged.map(applySpotlightFlag);
 }
 
 function readExcludedMap(): Record<string, string[]> {

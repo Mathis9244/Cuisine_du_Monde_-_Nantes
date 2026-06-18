@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import type { MapFilters, Restaurant } from "@/lib/types";
+import type { GeoPoint, MapFilters, Restaurant } from "@/lib/types";
 import { fetchRestaurants, fetchRestaurant } from "@/lib/api";
 import { APP_NAME } from "@/lib/constants";
 import { countryToCuisine } from "@/lib/mappers";
@@ -34,6 +34,7 @@ import {
   useAppUIState,
   useAuth,
   useFeaturedRestaurants,
+  useSpotlightRestaurants,
   useWheelCountries,
   useRestaurantStats,
   useExplorerPreferences,
@@ -47,6 +48,9 @@ import {
   filterRestaurantsByFeedFilter,
   filterExplorerResults,
   filterMapRestaurants,
+  countActiveExplorerFilters,
+  explorerApiSort,
+  EXPLORER_NEARBY_RADIUS_KM,
 } from "@/lib/restaurantFilters";
 import HomeHero from "./HomeHero";
 import RestaurantList from "./RestaurantList";
@@ -57,6 +61,10 @@ import WheelCountryView from "./WheelCountryView";
 import ProfileView from "./ProfileView";
 import ShareSheet from "./ShareSheet";
 import ExcludeCountryPrompt from "./ExcludeCountryPrompt";
+import ContinentCuisineSelect from "./ContinentCuisineSelect";
+import RecommendationsSection from "./RecommendationsSection";
+import SpotlightSection from "./SpotlightSection";
+import PromoteVisibilityCTA from "./PromoteVisibilityCTA";
 import AIResearch from "./AIResearch";
 import ThemeToggle from "./ThemeToggle";
 import LanguageToggle from "./LanguageToggle";
@@ -66,8 +74,19 @@ import {
   addExcludedCountry,
   getExcludedCountries,
   getRatedRestaurantIds,
+  mergeUserRatings,
   removeExcludedCountry,
+  setUserRating,
 } from "@/lib/userStore";
+import {
+  CONTINENT_ORDER,
+  filterCountriesByContinent,
+  type ContinentId,
+} from "@/lib/continents";
+import {
+  buildTasteProfile,
+  getRecommendations,
+} from "@/lib/recommendations";
 
 function MapLoadingFallback() {
   const { t } = useI18n();
@@ -124,6 +143,8 @@ const CircleApp: React.FC = () => {
   // Data fetching hooks
   const { restaurants: featuredRestaurants, loading: featuredLoading } =
     useFeaturedRestaurants();
+  const { restaurants: spotlightRaw, loading: spotlightLoading } =
+    useSpotlightRestaurants();
   const { countries: wheelCountries, loading: wheelLoading } =
     useWheelCountries();
   const restaurantStats = useRestaurantStats();
@@ -150,6 +171,11 @@ const CircleApp: React.FC = () => {
   );
   const [explorerLoading, setExplorerLoading] = useState(false);
   const [explorerError, setExplorerError] = useState<string | null>(null);
+  const [explorerUserLocation, setExplorerUserLocation] =
+    useState<GeoPoint | null>(null);
+  const [explorerLocationError, setExplorerLocationError] = useState<
+    string | null
+  >(null);
 
   // Wheel result
   const [wheelCountryRestaurants, setWheelCountryRestaurants] = useState<
@@ -182,6 +208,23 @@ const CircleApp: React.FC = () => {
   const [profileRestaurants, setProfileRestaurants] = useState<Restaurant[]>([]);
   const [profileRestaurantsLoading, setProfileRestaurantsLoading] =
     useState(false);
+  const [wheelContinent, setWheelContinent] = useState("");
+
+  const userRatingContext = useMemo(
+    () =>
+      user ? { username: user.username, avatarUrl: user.avatarUrl } : null,
+    [user],
+  );
+
+  const withUserRatings = useCallback(
+    (list: Restaurant[]) => mergeUserRatings(list, userRatingContext),
+    [userRatingContext],
+  );
+
+  const spotlightRestaurants = useMemo(
+    () => withUserRatings(spotlightRaw),
+    [spotlightRaw, withUserRatings],
+  );
 
   // Load feed restaurants
   useEffect(() => {
@@ -209,7 +252,7 @@ const CircleApp: React.FC = () => {
 
         if (reqId === loadFeedReqId.current) {
           setFeedTotalPages(res.meta.totalPages);
-          setFeedRestaurants(res.data);
+          setFeedRestaurants(withUserRatings(res.data));
         }
       } catch (err) {
         if (reqId === loadFeedReqId.current) {
@@ -225,18 +268,40 @@ const CircleApp: React.FC = () => {
     };
 
     void loadFeed();
-  }, [state.feedSearchQuery, state.viewAllCountry]);
+  }, [state.feedSearchQuery, state.viewAllCountry, withUserRatings]);
 
-  // Load explorer restaurants
+  // Debounced explorer search
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setExplorerSearchQuery(state.explorerSearchDraft.trim());
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [state.explorerSearchDraft, setExplorerSearchQuery]);
+
+  // Load explorer restaurants (server pre-filter + client refinement)
   useEffect(() => {
     if (!isSupabaseConfigured() || state.currentView !== "spin") return;
     let active = true;
     setExplorerLoading(true);
     setExplorerError(null);
 
-    fetchRestaurants({ limit: 100, sortBy: "rating", sortOrder: "desc" })
+    const apiSort = explorerApiSort(explorerPrefs.sortBy);
+
+    fetchRestaurants({
+      limit: 200,
+      search: state.explorerSearchQuery || undefined,
+      cuisine: explorerPrefs.cuisine
+        ? countryToCuisine(explorerPrefs.cuisine)
+        : undefined,
+      minRating:
+        explorerPrefs.minRating > 0 ? explorerPrefs.minRating : undefined,
+      hasWebsite: explorerPrefs.hasWebsite || undefined,
+      hasPhone: explorerPrefs.hasPhone || undefined,
+      sortBy: apiSort.sortBy,
+      sortOrder: apiSort.sortOrder,
+    })
       .then((res) => {
-        if (active) setExplorerRestaurants(res.data);
+        if (active) setExplorerRestaurants(withUserRatings(res.data));
       })
       .catch((err) => {
         if (active) {
@@ -252,7 +317,16 @@ const CircleApp: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [state.currentView]);
+  }, [
+    state.currentView,
+    state.explorerSearchQuery,
+    explorerPrefs.cuisine,
+    explorerPrefs.minRating,
+    explorerPrefs.hasWebsite,
+    explorerPrefs.hasPhone,
+    explorerPrefs.sortBy,
+    withUserRatings,
+  ]);
 
   // Load wheel country restaurants
   useEffect(() => {
@@ -276,7 +350,7 @@ const CircleApp: React.FC = () => {
     })
       .then((res) => {
         if (active && reqId === loadWheelCountryReqId.current) {
-          setWheelCountryRestaurants(res.data);
+          setWheelCountryRestaurants(withUserRatings(res.data));
         }
       })
       .catch((err) => {
@@ -295,7 +369,7 @@ const CircleApp: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [state.currentView, state.wheelCountry]);
+  }, [state.currentView, state.wheelCountry, withUserRatings]);
 
   // Load map restaurants
   useEffect(() => {
@@ -305,7 +379,7 @@ const CircleApp: React.FC = () => {
 
     fetchRestaurants({ limit: 200, sortBy: "name", sortOrder: "asc" })
       .then((res) => {
-        if (active) setMapRestaurants(res.data);
+        if (active) setMapRestaurants(withUserRatings(res.data));
       })
       .catch(() => {
         if (active) setMapRestaurants([]);
@@ -317,7 +391,7 @@ const CircleApp: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [state.currentView]);
+  }, [state.currentView, withUserRatings]);
 
   useEffect(() => {
     if (!user) {
@@ -326,6 +400,17 @@ const CircleApp: React.FC = () => {
     }
     setExcludedCountries(getExcludedCountries(user.id));
   }, [user]);
+
+  useEffect(() => {
+    if (!userRatingContext) return;
+    setFeedRestaurants((prev) => mergeUserRatings(prev, userRatingContext));
+    setExplorerRestaurants((prev) => mergeUserRatings(prev, userRatingContext));
+    setWheelCountryRestaurants((prev) =>
+      mergeUserRatings(prev, userRatingContext),
+    );
+    setMapRestaurants((prev) => mergeUserRatings(prev, userRatingContext));
+    setProfileRestaurants((prev) => mergeUserRatings(prev, userRatingContext));
+  }, [userRatingContext]);
 
   useEffect(() => {
     if (
@@ -358,7 +443,7 @@ const CircleApp: React.FC = () => {
               r.status === "fulfilled",
           )
           .map((r) => r.value);
-        setProfileRestaurants(loaded);
+        setProfileRestaurants(withUserRatings(loaded));
       })
       .finally(() => {
         if (active) setProfileRestaurantsLoading(false);
@@ -367,7 +452,7 @@ const CircleApp: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [state.currentView, user, state.targetProfile]);
+  }, [state.currentView, user, state.targetProfile, withUserRatings]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -415,16 +500,29 @@ const CircleApp: React.FC = () => {
   }, [logout]);
 
   const handleRateSuccess = useCallback(
-    (restaurantId: string, rating: number) => {
-      const update = (list: Restaurant[]) =>
-        list.map((res) => (res.id === restaurantId ? { ...res, rating } : res));
-      setFeedRestaurants(update);
-      setExplorerRestaurants(update);
-      setWheelCountryRestaurants(update);
-      setMapRestaurants(update);
-      setProfileRestaurants(update);
+    (restaurant: Restaurant, rating: number) => {
+      if (!user) return;
+      setUserRating(restaurant.id, rating);
+
+      const patchList = (list: Restaurant[]) =>
+        mergeUserRatings(
+          list.map((res) =>
+            res.id === restaurant.id ? { ...res, rating } : res,
+          ),
+          userRatingContext,
+        );
+
+      setFeedRestaurants(patchList);
+      setExplorerRestaurants(patchList);
+      setWheelCountryRestaurants(patchList);
+      setMapRestaurants(patchList);
+      setProfileRestaurants((prev) => {
+        const exists = prev.some((r) => r.id === restaurant.id);
+        const base = exists ? prev : [...prev, restaurant];
+        return patchList(base);
+      });
     },
-    [],
+    [user, userRatingContext],
   );
 
   const handleConfirmExclude = useCallback(() => {
@@ -572,8 +670,13 @@ const CircleApp: React.FC = () => {
     () =>
       Array.from(
         new Set([...countries, ...featuredRestaurants.map((r) => r.country)]),
-      ).sort(),
+      ).sort((a, b) => a.localeCompare(b, "fr")),
     [countries, featuredRestaurants],
+  );
+
+  const wheelDisplayCountries = useMemo(
+    () => filterCountriesByContinent(wheelCountries, wheelContinent),
+    [wheelCountries, wheelContinent],
   );
 
   const filteredRestaurants = useMemo(
@@ -593,17 +696,69 @@ const CircleApp: React.FC = () => {
     return new Set(matches.map((restaurant) => restaurant.country));
   }, [featuredRestaurants]);
 
-  const recommendedRestaurants = useMemo(() => {
+  const tasteProfile = useMemo(() => {
+    const pool = [
+      ...featuredRestaurants,
+      ...feedRestaurants,
+      ...explorerRestaurants,
+      ...profileRestaurants,
+    ];
+    return buildTasteProfile({
+      pool,
+      excludedCountries: user ? excludedCountries : [],
+    });
+  }, [
+    featuredRestaurants,
+    feedRestaurants,
+    explorerRestaurants,
+    profileRestaurants,
+    user,
+    excludedCountries,
+  ]);
+
+  const personalizedRecommendations = useMemo(() => {
     const pool =
-      featuredRestaurants.length > 0 ? featuredRestaurants : feedRestaurants;
-    return [...pool]
-      .sort(
-        (a, b) =>
-          scoreRestaurantForRecommendations(b, { favoriteCountries }) -
-          scoreRestaurantForRecommendations(a, { favoriteCountries }),
-      )
-      .slice(0, 6);
-  }, [favoriteCountries, featuredRestaurants, feedRestaurants]);
+      featuredRestaurants.length > 0
+        ? [
+            ...spotlightRestaurants,
+            ...featuredRestaurants,
+            ...feedRestaurants,
+          ]
+        : [...spotlightRestaurants, ...feedRestaurants];
+    return getRecommendations(pool, tasteProfile, favoriteCountries, 8);
+  }, [
+    favoriteCountries,
+    featuredRestaurants,
+    feedRestaurants,
+    spotlightRestaurants,
+    tasteProfile,
+  ]);
+
+  const profileSuggestions = useMemo(() => {
+    if (!user) return [];
+    const pool = [
+      ...featuredRestaurants,
+      ...feedRestaurants,
+      ...explorerRestaurants,
+      ...spotlightRestaurants,
+    ];
+    const rated = new Set(getRatedRestaurantIds());
+    const unrated = pool.filter((r) => !rated.has(r.id));
+    return getRecommendations(
+      unrated.length > 0 ? unrated : pool,
+      tasteProfile,
+      favoriteCountries,
+      4,
+    );
+  }, [
+    user,
+    featuredRestaurants,
+    feedRestaurants,
+    explorerRestaurants,
+    spotlightRestaurants,
+    tasteProfile,
+    favoriteCountries,
+  ]);
 
   const explorerResults = useMemo(
     () =>
@@ -613,7 +768,10 @@ const CircleApp: React.FC = () => {
           : featuredRestaurants,
         state.explorerSearchQuery,
         explorerPrefs,
-        favoriteCountries,
+        {
+          favoriteCountries,
+          userLocation: explorerUserLocation,
+        },
       ),
     [
       state.explorerSearchQuery,
@@ -621,8 +779,48 @@ const CircleApp: React.FC = () => {
       explorerRestaurants,
       featuredRestaurants,
       favoriteCountries,
+      explorerUserLocation,
     ],
   );
+
+  const activeExplorerFilters = useMemo(
+    () =>
+      countActiveExplorerFilters(
+        explorerPrefs,
+        state.explorerSearchQuery,
+      ),
+    [explorerPrefs, state.explorerSearchQuery],
+  );
+
+  const handleExplorerNearbyToggle = useCallback(() => {
+    const next = !explorerPrefs.nearbyOnly;
+    if (!next) {
+      updateExplorerPrefs({ nearbyOnly: false });
+      setExplorerLocationError(null);
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setExplorerLocationError(t("explorer.locationUnavailable"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setExplorerUserLocation({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+        setExplorerLocationError(null);
+        updateExplorerPrefs({ nearbyOnly: true });
+      },
+      () => {
+        setExplorerLocationError(t("explorer.locationDenied"));
+        updateExplorerPrefs({ nearbyOnly: false });
+      },
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
+  }, [explorerPrefs.nearbyOnly, t, updateExplorerPrefs]);
 
   const mapDisplayRestaurants = useMemo(
     () => filterMapRestaurants(mapRestaurants, mapFilters, favoriteCountries),
@@ -655,7 +853,7 @@ const CircleApp: React.FC = () => {
       });
 
       if (reqId === loadFeedReqId.current) {
-        setFeedRestaurants((prev) => [...prev, ...res.data]);
+        setFeedRestaurants((prev) => [...prev, ...withUserRatings(res.data)]);
       }
     } finally {
       if (reqId === loadFeedReqId.current) {
@@ -669,6 +867,7 @@ const CircleApp: React.FC = () => {
     feedPage,
     state.viewAllCountry,
     state.feedSearchQuery,
+    withUserRatings,
   ]);
 
   const isAtHome = state.currentView === "feed" && !state.viewAllCountry;
@@ -778,7 +977,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
           )}
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="hidden lg:flex items-center gap-4">
             <GooeyNav
               key={
@@ -852,17 +1051,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
           <button
             type="button"
-            onClick={() => setShareOpen(true)}
-            className="lg:hidden inline-flex items-center justify-center h-11 w-11 rounded-2xl border border-circle-border bg-circle-card/80 text-circle-frost/50 hover:text-circle-amber hover:border-circle-amber/60 transition-all"
-            aria-label={t("share.title")}
-            title={t("share.title")}
-          >
-            <Share2 size={18} />
-          </button>
-
-          <button
-            type="button"
-            className="lg:hidden inline-flex items-center justify-center h-11 w-11 rounded-2xl border border-circle-border bg-circle-card/80 text-circle-text/80 hover:text-circle-amber hover:border-circle-amber/60 transition-all"
+            className="lg:hidden inline-flex items-center justify-center h-11 w-11 rounded-2xl border border-circle-border bg-circle-card/80 text-circle-text/70 hover:text-circle-amber hover:border-circle-amber/60 transition-all"
             aria-label={
               state.mobileNavOpen ? "Fermer le menu" : "Ouvrir le menu"
             }
@@ -956,62 +1145,65 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 })}
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-circle-border bg-circle-card/70 p-3">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-circle-frost/40 font-black">
-                    Tools
-                  </p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <LanguageToggle />
-                    <ThemeToggle />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShareOpen(true);
-                        setMobileNavOpen(false);
-                      }}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-circle-border bg-circle-bg/70 text-circle-frost/60"
-                      aria-label={t("share.title")}
-                    >
-                      <Share2 size={16} />
-                    </button>
-                  </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShareOpen(true);
+                  setMobileNavOpen(false);
+                }}
+                className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl border border-circle-amber/40 bg-circle-amber/10 px-4 py-4 text-sm font-black uppercase tracking-[0.28em] text-circle-amber transition-all hover:bg-circle-amber/15 active:scale-[0.99]"
+              >
+                <Share2 size={18} />
+                {t("share.title")}
+              </button>
+
+              <div className="mt-6 rounded-2xl border border-circle-border bg-circle-card/70 p-4">
+                <p className="text-[10px] uppercase tracking-[0.3em] text-circle-frost/40 font-black">
+                  {t("nav.preferences")}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <LanguageToggle />
+                  <ThemeToggle />
                 </div>
-                <div className="rounded-2xl border border-circle-border bg-circle-card/70 p-3 flex min-h-[10rem] flex-col justify-center gap-2">
-                  {user?.isAdmin && (
-                    <Link
-                      href="/admin"
-                      className="flex items-center justify-center gap-2 rounded-xl border border-circle-border bg-circle-bg/70 px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/70"
-                      onClick={() => setMobileNavOpen(false)}
-                    >
-                      <Shield size={14} />
-                      Admin
-                    </Link>
-                  )}
-                  {user ? (
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setMobileNavOpen(false);
-                      }}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-circle-text px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-bg"
-                    >
-                      <LogOut size={14} />
-                      Logout
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setAuthOpen(true);
-                        setMobileNavOpen(false);
-                      }}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-circle-amber px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-[#081c1b]"
-                    >
-                      <LogIn size={14} />
-                      Login
-                    </button>
-                  )}
-                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-circle-border bg-circle-card/70 p-4 space-y-2">
+                <p className="text-[10px] uppercase tracking-[0.3em] text-circle-frost/40 font-black mb-1">
+                  {t("nav.account")}
+                </p>
+                {user?.isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-circle-border bg-circle-bg/70 px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-text/70"
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    <Shield size={14} />
+                    {t("nav.admin")}
+                  </Link>
+                )}
+                {user ? (
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setMobileNavOpen(false);
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-circle-text px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-bg"
+                  >
+                    <LogOut size={14} />
+                    {t("auth.logout")}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setAuthOpen(true);
+                      setMobileNavOpen(false);
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-circle-amber px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-[#081c1b]"
+                  >
+                    <LogIn size={14} />
+                    {t("auth.enter")}
+                  </button>
+                )}
               </div>
             </motion.aside>
           </>
@@ -1036,7 +1228,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       featuredRestaurants.length ??
                       feedRestaurants.length
                     }
-                    recommendedCount={recommendedRestaurants.length}
+                    recommendedCount={personalizedRecommendations.length}
                     cuisineCount={
                       restaurantStats?.byCuisine.length ?? countries.length
                     }
@@ -1118,46 +1310,40 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   </div>
                 </div>
 
-                <section className="space-y-5">
-                  {!hideRecommendedSection && (
-                    <div className="flex items-end justify-between gap-4">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                          {t("feed.recommended")}
-                        </p>
-                        <h2 className="mt-2 text-2xl md:text-3xl font-black uppercase tracking-tighter">
-                          {t("feed.recommended")}
-                        </h2>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("spin")}
-                        className="hidden md:inline-flex items-center gap-2 rounded-full border border-circle-border bg-circle-card px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/60 hover:text-circle-text transition-colors"
-                      >
-                        {t("feed.heroPrimary")}
-                      </button>
-                    </div>
-                  )}
+                {!state.viewAllCountry && !hideRecommendedSection && (
+                  spotlightLoading ? (
+                    <RestaurantListSkeleton count={2} />
+                  ) : (
+                    <SpotlightSection
+                      restaurants={spotlightRestaurants}
+                      onRate={handleRateRequest}
+                      onViewAll={handleCountrySelect}
+                      onProfileClick={handleProfileView}
+                    />
+                  )
+                )}
 
+                <section>
                   {!hideRecommendedSection &&
-                    (featuredLoading ? (
+                    (featuredLoading && feedRestaurants.length === 0 ? (
                       <RestaurantListSkeleton count={3} />
-                    ) : featuredRestaurants.length === 0 ? (
+                    ) : personalizedRecommendations.length === 0 ? (
                       <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-16">
                         {t("feed.empty")}
                       </p>
                     ) : (
-                      <RestaurantList
-                        restaurants={recommendedRestaurants}
+                      <RecommendationsSection
+                        items={personalizedRecommendations}
                         onRate={handleRateRequest}
                         onViewAll={handleCountrySelect}
                         onProfileClick={handleProfileView}
-                        isFiltered
                       />
                     ))}
                 </section>
 
                 <div className="border-t border-circle-border" />
+
+                {!state.viewAllCountry && <PromoteVisibilityCTA />}
               </div>
 
               <section id="explore" className="space-y-10">
@@ -1229,7 +1415,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     {t("feed.heroPrimary")}
                   </h2>
                   <p className="max-w-2xl mx-auto text-circle-frost/65">
-                    Combine plusieurs critères pour trouver le restaurant idéal.
+                    {t("explorer.lead")}
                   </p>
                 </div>
 
@@ -1238,57 +1424,37 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
                       {t("feed.search")}
                     </span>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={state.explorerSearchDraft}
-                        onChange={(e) => setExplorerSearchDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === " " || e.key === "Enter") {
-                            e.preventDefault();
-                            setExplorerSearchQuery(
-                              state.explorerSearchDraft.trim(),
-                            );
-                          }
-                        }}
-                        placeholder={t("feed.search")}
-                        className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
+                    <div className="relative">
+                      <Search
+                        size={16}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-circle-frost/30"
                       />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExplorerSearchQuery(
-                            state.explorerSearchDraft.trim(),
-                          )
+                      <input
+                        type="search"
+                        value={state.explorerSearchDraft}
+                        onChange={(e) =>
+                          setExplorerSearchDraft(e.target.value)
                         }
-                        className="rounded-2xl border border-circle-border bg-circle-card px-4 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/70 hover:text-circle-amber transition-colors"
-                      >
-                        Go
-                      </button>
+                        placeholder={t("explorer.searchPlaceholder")}
+                        className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 py-3 pl-11 pr-4 text-sm font-bold outline-none focus:border-circle-amber"
+                      />
                     </div>
                   </label>
-                  <label className="space-y-2">
-                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                      Cuisine
-                    </span>
-                    <select
-                      value={explorerPrefs.cuisine}
-                      onChange={(e) =>
-                        updateExplorerPrefs({ cuisine: e.target.value })
-                      }
-                      className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
-                    >
-                      <option value="">{t("feed.filter.all")}</option>
-                      {cuisineOptions.map((country) => (
-                        <option key={country} value={country}>
-                          {country}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <ContinentCuisineSelect
+                    countries={cuisineOptions}
+                    continent={explorerPrefs.continent}
+                    cuisine={explorerPrefs.cuisine}
+                    onContinentChange={(continent) =>
+                      updateExplorerPrefs({ continent })
+                    }
+                    onCuisineChange={(cuisine) =>
+                      updateExplorerPrefs({ cuisine })
+                    }
+                    className="md:col-span-3 grid gap-3 sm:grid-cols-2"
+                  />
                   <label className="space-y-2">
                     <span className="flex items-center justify-between text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                      <span>Note min.</span>
+                      <span>{t("explorer.minRating")}</span>
                       <span>{explorerPrefs.minRating.toFixed(1)}</span>
                     </span>
                     <input
@@ -1307,7 +1473,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   </label>
                   <label className="space-y-2">
                     <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                      Tri
+                      {t("explorer.sort")}
                     </span>
                     <select
                       value={explorerPrefs.sortBy}
@@ -1322,41 +1488,121 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                         {t("feed.recommended")}
                       </option>
                       <option value="rating">{t("feed.filter.top")}</option>
-                      <option value="newest">Nouveautés</option>
+                      <option value="distance">{t("feed.filter.nearby")}</option>
+                      <option value="newest">{t("explorer.sort.newest")}</option>
                     </select>
                   </label>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateExplorerPrefs({
-                        hasWebsite: !explorerPrefs.hasWebsite,
-                      })
-                    }
-                    className={`rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
-                      explorerPrefs.hasWebsite
-                        ? "border-circle-amber/50 bg-circle-amber text-[#081c1b]"
-                        : "border-circle-border bg-circle-bg/60 text-circle-frost/60"
-                    }`}
-                  >
-                    Site web
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetExplorerPrefs}
-                    className="rounded-full border border-circle-border bg-circle-bg/60 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/60"
-                  >
-                    {t("feed.filter.reset")}
-                  </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(
+                    [
+                      {
+                        key: "hasWebsite",
+                        label: t("feed.filter.website"),
+                        active: explorerPrefs.hasWebsite,
+                        onClick: () =>
+                          updateExplorerPrefs({
+                            hasWebsite: !explorerPrefs.hasWebsite,
+                          }),
+                      },
+                      {
+                        key: "hasPhone",
+                        label: t("explorer.filter.phone"),
+                        active: explorerPrefs.hasPhone,
+                        onClick: () =>
+                          updateExplorerPrefs({
+                            hasPhone: !explorerPrefs.hasPhone,
+                          }),
+                      },
+                      {
+                        key: "hasReviews",
+                        label: t("feed.filter.reviews"),
+                        active: explorerPrefs.hasReviews,
+                        onClick: () =>
+                          updateExplorerPrefs({
+                            hasReviews: !explorerPrefs.hasReviews,
+                          }),
+                      },
+                      {
+                        key: "nearbyOnly",
+                        label: t("explorer.filter.nearby", {
+                          km: EXPLORER_NEARBY_RADIUS_KM,
+                        }),
+                        active: explorerPrefs.nearbyOnly,
+                        onClick: handleExplorerNearbyToggle,
+                      },
+                    ] as const
+                  ).map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={chip.onClick}
+                      className={`rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
+                        chip.active
+                          ? "border-circle-amber/50 bg-circle-amber text-[#081c1b]"
+                          : "border-circle-border bg-circle-bg/60 text-circle-frost/60"
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                  {activeExplorerFilters > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetExplorerPrefs();
+                        setExplorerSearchDraft("");
+                        setExplorerSearchQuery("");
+                        setExplorerLocationError(null);
+                      }}
+                      className="rounded-full border border-circle-border bg-circle-bg/60 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/60"
+                    >
+                      {t("feed.filter.reset")}
+                    </button>
+                  )}
                 </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/40">
+                  <span>
+                    {t("explorer.results", { count: explorerResults.length })}
+                  </span>
+                  {activeExplorerFilters > 0 && (
+                    <span>
+                      {t("explorer.activeFilters", {
+                        count: activeExplorerFilters,
+                      })}
+                    </span>
+                  )}
+                </div>
+
+                {explorerLocationError && (
+                  <p className="text-sm text-amber-200/90 font-medium">
+                    {explorerLocationError}
+                  </p>
+                )}
+
+                <PromoteVisibilityCTA />
+
+                {!explorerLoading && personalizedRecommendations.length > 0 && (
+                  <RecommendationsSection
+                    items={personalizedRecommendations.slice(0, 4)}
+                    onRate={handleRateRequest}
+                    onViewAll={handleCountrySelect}
+                    onProfileClick={handleProfileView}
+                    compact
+                  />
+                )}
 
                 {explorerLoading ? (
                   <RestaurantListSkeleton count={4} />
                 ) : explorerError ? (
                   <p className="text-center text-red-300 font-bold py-24">
                     {explorerError}
+                  </p>
+                ) : explorerResults.length === 0 ? (
+                  <p className="text-center text-circle-frost/50 font-bold uppercase tracking-widest text-sm py-24">
+                    {t("explorer.empty")}
                   </p>
                 ) : (
                   <RestaurantList
@@ -1391,16 +1637,41 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   </p>
                 </div>
 
+                <div className="mx-auto max-w-md">
+                  <label className="block space-y-2">
+                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                      {t("continent.label")}
+                    </span>
+                    <select
+                      value={wheelContinent}
+                      onChange={(e) => setWheelContinent(e.target.value)}
+                      className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
+                    >
+                      <option value="">{t("continent.all")}</option>
+                      {CONTINENT_ORDER.filter((id) =>
+                        wheelCountries.some(
+                          (c) =>
+                            filterCountriesByContinent([c], id).length > 0,
+                        ),
+                      ).map((id) => (
+                        <option key={id} value={id}>
+                          {t(`continent.${id}` as `continent.${ContinentId}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
                 {wheelLoading ? (
                   <RestaurantListSkeleton count={1} />
-                ) : wheelCountries.length === 0 ? (
+                ) : wheelDisplayCountries.length === 0 ? (
                   <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-24">
                     {t("home.empty")}
                   </p>
                 ) : (
                   <div className="flex justify-center pb-6 sm:pb-10">
                     <WheelOfFortune
-                      segments={wheelCountries}
+                      segments={wheelDisplayCountries}
                       excludedSegments={excludedCountries}
                       onResult={handleWheelResult}
                     />
@@ -1500,6 +1771,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       ? excludedCountries
                       : []
                   }
+                  suggestions={
+                    user && state.targetProfile.name === user.username
+                      ? profileSuggestions
+                      : []
+                  }
                   onBack={() => setCurrentView("feed")}
                   onRate={handleRateRequest}
                   onProfileClick={handleProfileView}
@@ -1578,7 +1854,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 restaurantId={state.ratingTarget.id}
                 onRate={(val) => {
                   const rated = state.ratingTarget!;
-                  handleRateSuccess(rated.id, val);
+                  handleRateSuccess(rated, val);
                   window.setTimeout(() => {
                     setRatingTarget(null);
                     if (

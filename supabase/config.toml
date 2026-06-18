@@ -1,0 +1,5 @@
+# Minimal Supabase CLI config for remote migrations.
+project_id = "qnnyznxxrsilkzapyuuv"
+
+[db]
+major_version = 15

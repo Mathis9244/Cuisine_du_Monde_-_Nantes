@@ -4,20 +4,29 @@ import type { MapFilters } from "@/lib/types";
 export type ExplorerSort = "recommended" | "rating" | "distance" | "newest";
 
 export interface ExplorerPreferences {
+  continent: string;
   cuisine: string;
   minRating: number;
   hasWebsite: boolean;
+  hasPhone: boolean;
+  hasReviews: boolean;
+  nearbyOnly: boolean;
   sortBy: ExplorerSort;
 }
 
 const DEFAULT_EXPLORER_PREFS: ExplorerPreferences = {
+  continent: "",
   cuisine: "",
   minRating: 0,
   hasWebsite: false,
+  hasPhone: false,
+  hasReviews: false,
+  nearbyOnly: false,
   sortBy: "recommended",
 };
 
 const DEFAULT_MAP_FILTERS: MapFilters = {
+  continent: "",
   cuisine: "",
   minRating: 0,
   sortBy: "recommended",

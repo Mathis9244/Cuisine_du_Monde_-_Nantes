@@ -5,6 +5,7 @@ import { Star } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { rateRestaurant } from "@/lib/api";
+import { getRatingsStore, setUserRating } from "@/lib/userStore";
 
 interface StarRatingProps {
   restaurantId: string;
@@ -16,6 +17,11 @@ const StarRating: React.FC<StarRatingProps> = ({ restaurantId, onRate }) => {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const stored = getRatingsStore()[restaurantId];
+    if (stored) setRating(stored);
+  }, [restaurantId]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -34,13 +40,14 @@ const StarRating: React.FC<StarRatingProps> = ({ restaurantId, onRate }) => {
 
   const handleRate = async (val: number) => {
     if (!isLoggedIn) return;
+    setUserRating(restaurantId, val);
+    setRating(val);
     try {
-      const updated = await rateRestaurant(restaurantId, val);
-      setRating(val);
-      if (onRate) onRate(updated.rating ?? val);
+      await rateRestaurant(restaurantId, val);
     } catch {
-      // On garde l'UI stable si la persistance échoue.
+      // Le journal local reste enregistré même si l'API échoue.
     }
+    onRate?.(val);
   };
 
   return (

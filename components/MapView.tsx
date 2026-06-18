@@ -10,6 +10,7 @@ import "leaflet.markercluster";
 import type { MapFilters, Restaurant } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
+import ContinentCuisineSelect from "./ContinentCuisineSelect";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -264,27 +265,20 @@ const MapView: React.FC<MapViewProps> = ({
           </span>
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
-          <label className="rounded-2xl border border-circle-border bg-circle-bg/60 p-3">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-circle-frost/35 font-black">
-              {t("map.filters")}
-            </span>
-            <select
-              value={filters.cuisine}
-              onChange={(e) => onFiltersChange({ cuisine: e.target.value })}
-              className="mt-2 w-full bg-transparent text-sm font-bold outline-none"
-            >
-              <option value="">{t("feed.filter.all")}</option>
-              {Array.from(new Set(restaurants.map((r) => r.country)))
-                .sort()
-                .map((country) => (
-                  <option key={country} value={country}>
-                    {country}
-                  </option>
-                ))}
-              </select>
-          </label>
+        <div className="mt-4 space-y-3">
+          <ContinentCuisineSelect
+            countries={Array.from(new Set(restaurants.map((r) => r.country))).sort(
+              (a, b) => a.localeCompare(b, "fr"),
+            )}
+            continent={filters.continent}
+            cuisine={filters.cuisine}
+            onContinentChange={(continent) => onFiltersChange({ continent })}
+            onCuisineChange={(cuisine) => onFiltersChange({ cuisine })}
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2"
+            selectClassName="mt-2 w-full bg-transparent text-sm font-bold outline-none"
+          />
 
+          <div className="grid gap-3 lg:grid-cols-2">
           <label className="rounded-2xl border border-circle-border bg-circle-bg/60 p-3">
             <span className="flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-circle-frost/35 font-black">
               <span>Note min.</span>
@@ -321,6 +315,7 @@ const MapView: React.FC<MapViewProps> = ({
               <option value="popular">{t("map.popularity")}</option>
             </select>
           </label>
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -328,6 +323,7 @@ const MapView: React.FC<MapViewProps> = ({
             type="button"
             onClick={() =>
               onFiltersChange({
+                continent: "",
                 cuisine: "",
                 minRating: 0,
                 sortBy: "recommended",

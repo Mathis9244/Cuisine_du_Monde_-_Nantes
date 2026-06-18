@@ -37,6 +37,35 @@ export function useFeaturedRestaurants() {
   return { restaurants, loading, error };
 }
 
+export function useSpotlightRestaurants() {
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    let active = true;
+    setLoading(true);
+
+    fetchRestaurants({ spotlight: true, limit: 12 })
+      .then((res) => {
+        if (active) setRestaurants(res.data);
+      })
+      .catch(() => {
+        if (active) setRestaurants([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return { restaurants, loading };
+}
+
 export function useWheelCountries() {
   const [countries, setCountries] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);

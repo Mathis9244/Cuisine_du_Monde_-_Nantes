@@ -125,17 +125,25 @@ body {
 .gooey-nav-container .effect.text {
   color: #ffffff;
   font-weight: 800;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   z-index: 11;
   opacity: 0;
   transition: opacity 0.2s;
+  white-space: nowrap;
 }
-.gooey-nav-container[data-theme="light"] .effect.text,
+
+@media (min-width: 640px) {
+  .gooey-nav-container .effect.text {
+    font-size: 0.75rem;
+  }
+}
+
 [data-theme="light"] .gooey-nav-container .effect.text {
-  color: rgb(var(--c-bg));
+  color: #081c1b;
 }
+
 .gooey-nav-container .effect.text.active {
   opacity: 1;
 }
@@ -155,6 +163,11 @@ body {
   z-index: -1;
   border-radius: 100vw;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="light"] .gooey-nav-container .effect.filter::after {
+  background: var(--color-1);
+  border: 1px solid rgba(8, 28, 27, 0.14);
 }
 .gooey-nav-container .effect.active::after {
   animation: pill 0.3s ease both;

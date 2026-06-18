@@ -9,10 +9,13 @@ export interface DbRestaurant {
   latitude: number | null;
   longitude: number | null;
   website: string | null;
+  url?: string | null;
   phone: string | null;
   source: string | null;
   source_id: string | null;
   is_active: boolean;
+  boost_until?: string | null;
+  boost_tier?: number;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +42,11 @@ export interface Restaurant {
   latitude?: number | null;
   longitude?: number | null;
   friendRatings?: FriendRating[];
+  /** Fin du boost payant (ISO). Visible admin uniquement côté API brute. */
+  boostUntil?: string | null;
+  boostTier?: number;
+  /** Boost actif + restaurant moins connu. */
+  isSpotlight?: boolean;
 }
 
 export interface Paginated<T> {
@@ -71,6 +79,7 @@ export interface ExplorerFilters {
 }
 
 export interface MapFilters {
+  continent: string;
   cuisine: string;
   minRating: number;
   sortBy: "recommended" | "rating" | "distance" | "popular";

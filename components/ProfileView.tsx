@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import type { Restaurant } from "@/lib/types";
 import RestaurantCard from "./RestaurantCard";
+import RecommendationsSection, {
+  type RecommendationItem,
+} from "./RecommendationsSection";
 import { useI18n } from "@/lib/i18n";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { uploadAvatar } from "@/lib/avatarUpload";
@@ -32,6 +35,7 @@ interface ProfileViewProps {
   restaurants: Restaurant[];
   isOwnProfile?: boolean;
   excludedCountries?: string[];
+  suggestions?: RecommendationItem[];
   onBack: () => void;
   onRate: (restaurant: Restaurant) => void;
   onProfileClick: (profile: { name: string; avatar: string }) => void;
@@ -48,6 +52,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
   restaurants,
   isOwnProfile = false,
   excludedCountries = [],
+  suggestions = [],
   onRate,
   onProfileClick,
   onProfileUpdate,
@@ -441,6 +446,20 @@ const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </div>
       </div>
+
+      {isOwnProfile && suggestions.length > 0 && (
+        <div className="px-2">
+          <h3 className="mb-4 text-lg font-black uppercase tracking-tight text-circle-text sm:text-xl">
+            {t("reco.profileTitle")}
+          </h3>
+          <RecommendationsSection
+            items={suggestions}
+            onRate={onRate}
+            onProfileClick={onProfileClick}
+            compact
+          />
+        </div>
+      )}
 
       {isOwnProfile && excludedCountries.length > 0 && (
         <section className="space-y-4 px-2">
