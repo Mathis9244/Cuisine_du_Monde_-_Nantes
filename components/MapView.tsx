@@ -203,7 +203,7 @@ const MapView: React.FC<MapViewProps> = ({
   const center: [number, number] = [47.2184, -1.5536];
   const tileUrl =
     resolved === "dark"
-      ? "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png"
+      ? "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       : "https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png";
   const tileAttribution =
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
@@ -263,7 +263,7 @@ const MapView: React.FC<MapViewProps> = ({
         <div className="mt-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
           <span>{t("map.skin")}</span>
           <span className="rounded-full border border-circle-border bg-circle-bg/70 px-3 py-1 text-circle-frost/60">
-            {resolved === "dark" ? "dark" : "light"}
+            {resolved === "dark" ? "voyager" : "light"}
           </span>
         </div>
 
