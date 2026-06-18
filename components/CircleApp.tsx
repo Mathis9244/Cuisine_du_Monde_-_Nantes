@@ -676,6 +676,19 @@ const CircleApp: React.FC = () => {
   ]);
 
   const isAtHome = state.currentView === "feed" && !state.viewAllCountry;
+  const activeNavIndex =
+    state.currentView === "feed"
+      ? 0
+      : state.currentView === "map"
+        ? 1
+        : state.currentView === "spin"
+          ? 2
+          : state.currentView === "wheel" ||
+              state.currentView === "wheel-result"
+            ? 3
+            : state.currentView === "ai"
+              ? 4
+              : 5;
 
   const authFormContent = (
     <form onSubmit={handleLogin} className="space-y-6">
@@ -825,11 +838,6 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
         <div className="flex items-center gap-2 md:gap-4">
           <div className="hidden lg:flex items-center gap-4">
             <GooeyNav
-              key={
-                state.currentView === "wheel-result"
-                  ? "wheel"
-                  : state.currentView
-              }
               items={[
                 { label: t("nav.feed") },
                 { label: t("nav.map") },
@@ -839,21 +847,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 { label: t("nav.you") },
               ]}
               onNav={handleNav}
-              initialActiveIndex={
-                state.currentView === "feed"
-                  ? 0
-                  : state.currentView === "map"
-                    ? 1
-                    : state.currentView === "spin"
-                      ? 2
-                      : state.currentView === "wheel"
-                        ? 3
-                        : state.currentView === "wheel-result"
-                          ? 3
-                          : state.currentView === "ai"
-                            ? 4
-                            : 5
-              }
+              activeIndex={activeNavIndex}
             />
             {user?.isAdmin && (
               <Link

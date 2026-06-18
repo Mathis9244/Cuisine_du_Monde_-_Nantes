@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect } from "react";
 
 interface NavItem {
   label: string;
@@ -15,7 +15,7 @@ interface GooeyNavProps {
   particleR?: number;
   timeVariance?: number;
   colors?: number[];
-  initialActiveIndex?: number;
+  activeIndex: number;
 }
 
 const GooeyNav: React.FC<GooeyNavProps> = ({
@@ -27,17 +27,13 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
   particleR = 100,
   timeVariance = 300,
   colors = [1, 2, 3, 1, 2, 3, 4, 1],
-  initialActiveIndex = 0,
+  activeIndex,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLUListElement>(null);
   const filterRef = useRef<HTMLSpanElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
-  const [activeIndex, setActiveIndex] = useState(initialActiveIndex);
-
-  useEffect(() => {
-    setActiveIndex(initialActiveIndex);
-  }, [initialActiveIndex]);
+  const previousActiveIndexRef = useRef(activeIndex);
 
   const noise = (n = 1) => n / 2 - Math.random() * n;
 
@@ -69,11 +65,13 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
     const r = particleR;
     const bubbleTime = animationTime * 2 + timeVariance;
     element.style.setProperty("--time", `${bubbleTime}ms`);
+    element.classList.remove("active");
+    void element.offsetWidth;
+    element.classList.add("active");
 
     for (let i = 0; i < particleCount; i++) {
       const t = animationTime * 2 + noise(timeVariance * 2);
       const p = createParticle(i, t, d, r);
-      element.classList.remove("active");
 
       setTimeout(() => {
         const particle = document.createElement("span");
@@ -91,9 +89,6 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
         point.classList.add("point");
         particle.appendChild(point);
         element.appendChild(particle);
-        requestAnimationFrame(() => {
-          element.classList.add("active");
-        });
         setTimeout(() => {
           try {
             element.removeChild(particle);
@@ -122,24 +117,9 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
       (element.querySelector("button") as HTMLElement | null)?.innerText ?? "";
   };
 
-  const handleClick = (liEl: HTMLElement, index: number) => {
+  const handleClick = (index: number) => {
     if (activeIndex === index) return;
-
-    setActiveIndex(index);
     onNav(index);
-    updateEffectPosition(liEl);
-
-    if (filterRef.current) {
-      const particles = filterRef.current.querySelectorAll(".particle");
-      particles.forEach((p) => filterRef.current?.removeChild(p));
-      makeParticles(filterRef.current);
-    }
-
-    if (textRef.current) {
-      textRef.current.classList.remove("active");
-      void textRef.current.offsetWidth;
-      textRef.current.classList.add("active");
-    }
   };
 
   useEffect(() => {
@@ -151,7 +131,23 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
       updateEffectPosition(activeLi);
       textRef.current?.classList.add("active");
       requestAnimationFrame(() => updateEffectPosition(activeLi));
+
+      if (
+        previousActiveIndexRef.current !== activeIndex &&
+        filterRef.current
+      ) {
+        const particles = filterRef.current.querySelectorAll(".particle");
+        particles.forEach((particle) => particle.remove());
+        makeParticles(filterRef.current);
+
+        if (textRef.current) {
+          textRef.current.classList.remove("active");
+          void textRef.current.offsetWidth;
+          textRef.current.classList.add("active");
+        }
+      }
     }
+    previousActiveIndexRef.current = activeIndex;
 
     const resizeObserver = new ResizeObserver(() => {
       const currentActiveLi = navRef.current?.querySelectorAll("li")[
@@ -179,9 +175,7 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
               <button
                 type="button"
                 aria-current={activeIndex === index ? "page" : undefined}
-                onClick={(event) =>
-                  handleClick(event.currentTarget.parentElement!, index)
-                }
+                onClick={() => handleClick(index)}
               >
                 {item.label}
               </button>
@@ -189,7 +183,11 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
           ))}
         </ul>
       </nav>
-      <span aria-hidden="true" className="effect filter" ref={filterRef} />
+      <span
+        aria-hidden="true"
+        className="effect filter active"
+        ref={filterRef}
+      />
       <span aria-hidden="true" className="effect text active" ref={textRef} />
     </div>
   );
