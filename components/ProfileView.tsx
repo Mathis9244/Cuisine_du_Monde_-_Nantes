@@ -264,7 +264,11 @@ const ProfileView: React.FC<ProfileViewProps> = ({
               }}
               className="inline-flex items-center gap-2 rounded-2xl border border-circle-border bg-circle-card/80 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.28em] text-circle-text/80"
             >
-              {editing ? <X size={14} /> : <Pencil size={14} />}
+              {editing ? (
+                <X size={14} aria-hidden="true" />
+              ) : (
+                <Pencil size={14} aria-hidden="true" />
+              )}
               {editing ? t("profile.cancelEdit") : t("profile.edit")}
             </button>
             {onLogout && (
@@ -273,7 +277,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                 onClick={onLogout}
                 className="inline-flex items-center gap-2 rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.28em] text-circle-frost/60"
               >
-                <LogOut size={14} />
+                <LogOut size={14} aria-hidden="true" />
                 {t("profile.logout")}
               </button>
             )}
@@ -294,11 +298,15 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                     {t("profile.field.username")}
                   </span>
                   <input
+                    id="profile-username"
+                    name="username"
+                    autoComplete="username"
+                    spellCheck={false}
                     value={form.username}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, username: e.target.value }))
                     }
-                    className="w-full rounded-xl border border-circle-border bg-circle-bg px-4 py-3 text-sm font-bold text-circle-text outline-none focus:border-circle-teal"
+                    className="w-full rounded-xl border border-circle-border bg-circle-bg px-4 py-3 text-sm font-bold text-circle-text focus:border-circle-teal"
                   />
                 </label>
                 <label className="block space-y-1.5">
@@ -306,12 +314,16 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                     {t("profile.field.email")}
                   </span>
                   <input
+                    id="profile-email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
+                    spellCheck={false}
                     value={form.email}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, email: e.target.value }))
                     }
-                    className="w-full rounded-xl border border-circle-border bg-circle-bg px-4 py-3 text-sm font-bold text-circle-text outline-none focus:border-circle-teal"
+                    className="w-full rounded-xl border border-circle-border bg-circle-bg px-4 py-3 text-sm font-bold text-circle-text focus:border-circle-teal"
                   />
                 </label>
                 <div className="space-y-2">
@@ -340,7 +352,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                     <div className="flex w-full flex-col gap-2 sm:flex-1">
                       <input
                         id={avatarInputId}
+                        name="avatar"
                         type="file"
+                        accept="image/jpeg,image/png,image/gif"
+                        aria-describedby={`${avatarInputId}-hint`}
                         className="sr-only"
                         disabled={uploadingAvatar}
                         onChange={(e) => void handleAvatarPick(e)}
@@ -356,15 +371,22 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                         }`}
                       >
                         {uploadingAvatar ? (
-                          <Loader2 size={14} className="animate-spin" />
+                          <Loader2
+                            size={14}
+                            aria-hidden="true"
+                            className="animate-spin"
+                          />
                         ) : (
-                          <Camera size={14} />
+                          <Camera size={14} aria-hidden="true" />
                         )}
                         {uploadingAvatar
                           ? t("profile.avatar.uploading")
                           : t("profile.avatar.choose")}
                       </button>
-                      <p className="text-[10px] text-circle-frost/40">
+                      <p
+                        id={`${avatarInputId}-hint`}
+                        className="text-[10px] text-circle-frost/70"
+                      >
                         {t("profile.avatar.hint")}
                       </p>
                       <p className="text-[10px] text-circle-frost/30">
@@ -374,7 +396,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                         {t("profile.avatar.onedrive")}
                       </p>
                       {saveError && (
-                        <p className="text-xs font-bold text-red-300">{saveError}</p>
+                        <p role="alert" className="text-xs font-bold text-red-300">
+                          {saveError}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -384,17 +408,22 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                     {t("profile.field.bio")}
                   </span>
                   <textarea
+                    id="profile-bio"
+                    name="bio"
+                    autoComplete="off"
                     value={form.bio}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, bio: e.target.value }))
                     }
                     rows={3}
                     maxLength={280}
-                    className="w-full resize-none rounded-xl border border-circle-border bg-circle-bg px-4 py-3 text-sm text-circle-text outline-none focus:border-circle-teal"
+                    className="w-full resize-none rounded-xl border border-circle-border bg-circle-bg px-4 py-3 text-sm text-circle-text focus:border-circle-teal"
                   />
                 </label>
                 {saveError && (
-                  <p className="text-xs font-bold text-red-300">{saveError}</p>
+                  <p role="alert" className="text-xs font-bold text-red-300">
+                    {saveError}
+                  </p>
                 )}
                 <button
                   type="button"
@@ -403,9 +432,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-circle-amber py-3.5 text-[10px] font-black uppercase tracking-[0.3em] text-[#081c1b] disabled:opacity-60"
                 >
                   {saving ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2
+                      size={16}
+                      aria-hidden="true"
+                      className="animate-spin"
+                    />
                   ) : (
-                    <Save size={16} />
+                    <Save size={16} aria-hidden="true" />
                   )}
                   {t("profile.save")}
                 </button>
@@ -445,7 +478,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
       {isOwnProfile && excludedCountries.length > 0 && (
         <section className="space-y-4 px-2">
           <div className="flex items-center gap-2">
-            <Ban size={16} className="text-circle-amber" />
+            <Ban size={16} aria-hidden="true" className="text-circle-amber" />
             <h3 className="text-lg font-black uppercase tracking-tight text-circle-text sm:text-xl">
               {t("profile.excludedTitle")}
             </h3>
@@ -460,7 +493,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                 className="inline-flex items-center gap-2 rounded-full border border-circle-border bg-circle-bg/60 px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-circle-frost/70"
               >
                 {country}
-                <X size={12} />
+                <X size={12} aria-hidden="true" />
               </button>
             ))}
           </div>

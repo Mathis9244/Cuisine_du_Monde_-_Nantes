@@ -51,12 +51,12 @@ const RestaurantList: React.FC<RestaurantListProps> = ({
         ([country, items]) => (
           <section key={country} className="space-y-12">
             <div className="flex items-baseline justify-between border-b border-circle-border pb-8">
-              <h3 className="text-6xl font-black text-circle-text tracking-tighter uppercase">
+              <h2 className="text-4xl font-black text-circle-text tracking-tighter uppercase sm:text-5xl md:text-6xl">
                 {country}
-              </h3>
+              </h2>
               <button
                 onClick={() => onViewAll(country)}
-                className="text-xs font-black uppercase tracking-[0.5em] text-circle-text/30 hover:text-circle-text transition-colors"
+                className="text-xs font-black uppercase tracking-[0.5em] text-circle-text/70 hover:text-circle-text transition-colors"
               >
                 {t("list.all", { count: items.length })}
               </button>

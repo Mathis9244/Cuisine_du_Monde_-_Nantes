@@ -3,7 +3,11 @@ import "swagger-ui-react/swagger-ui.css";
 
 export default function DocsPage() {
   return (
-    <main className="min-h-screen bg-[#081c1b] text-white p-6 md:p-10">
+    <main
+      id="contenu-principal"
+      tabIndex={-1}
+      className="min-h-screen bg-[#081c1b] text-white p-6 md:p-10"
+    >
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="space-y-2">
           <p className="text-[10px] uppercase tracking-[0.35em] text-amber-300">API</p>

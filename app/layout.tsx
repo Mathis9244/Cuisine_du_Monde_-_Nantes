@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider, themeNoFlashScript } from "@/lib/theme";
 import { I18nProvider } from "@/lib/i18n";
 import PWARegister from "@/components/PWARegister";
+import SkipLink from "@/components/SkipLink";
 
 import { APP_NAME } from "@/lib/constants";
 
@@ -60,8 +61,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
       </head>
       <body>
+        <SkipLink />
         {/* Filtre SVG utilisé par GooeyNav */}
         <svg
+          aria-hidden="true"
+          focusable="false"
           style={{ visibility: "hidden", position: "absolute" }}
           width="0"
           height="0"

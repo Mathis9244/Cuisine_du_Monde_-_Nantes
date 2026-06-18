@@ -11,12 +11,13 @@ const LanguageToggle: React.FC = () => {
 
   return (
     <button
+      type="button"
       onClick={toggle}
       title={t("lang.label")}
       aria-label={t("lang.label")}
       className="flex items-center gap-1.5 text-circle-frost/40 hover:text-circle-amber transition-colors p-2"
     >
-      <Languages size={20} />
+      <Languages size={20} aria-hidden="true" />
       <span className="text-[11px] font-black uppercase tracking-widest">
         {display}
       </span>

@@ -81,7 +81,7 @@ const AIResearch: React.FC = () => {
     <div className="flex flex-col h-[70vh] max-h-[800px] bg-circle-card border border-circle-border rounded-[2.5rem] overflow-hidden">
       <div className="p-6 border-b border-circle-border bg-circle-bg/50">
         <h2 className="text-2xl font-black text-circle-amber uppercase tracking-widest flex items-center gap-3">
-          <Bot size={28} />
+          <Bot size={28} aria-hidden="true" />
           {t("ai.title")}
         </h2>
         <p className="text-circle-frost/60 text-xs font-bold uppercase tracking-widest mt-2">
@@ -89,7 +89,13 @@ const AIResearch: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+      <div
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
+        aria-label={t("ai.title")}
+        className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar"
+      >
         {messages.map((msg) => (
           <motion.div
             key={msg.id}
@@ -104,7 +110,11 @@ const AIResearch: React.FC = () => {
                   : "bg-circle-teal/20 text-circle-teal"
               }`}
             >
-              {msg.role === "user" ? <User size={20} /> : <Bot size={20} />}
+              {msg.role === "user" ? (
+                <User size={20} aria-hidden="true" />
+              ) : (
+                <Bot size={20} aria-hidden="true" />
+              )}
             </div>
             <div
               className={`max-w-[80%] rounded-2xl p-4 ${
@@ -130,10 +140,14 @@ const AIResearch: React.FC = () => {
             className="flex gap-4"
           >
             <div className="w-10 h-10 rounded-full bg-circle-teal/20 text-circle-teal flex items-center justify-center shrink-0">
-              <Bot size={20} />
+              <Bot size={20} aria-hidden="true" />
             </div>
             <div className="bg-circle-border/50 border border-circle-border rounded-2xl rounded-tl-none p-4 flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin text-circle-teal" />
+              <Loader2
+                size={16}
+                aria-hidden="true"
+                className="animate-spin text-circle-teal"
+              />
               <span className="text-xs text-circle-frost/60 uppercase tracking-widest font-bold">
                 {t("ai.thinking")}
               </span>
@@ -145,20 +159,27 @@ const AIResearch: React.FC = () => {
 
       <div className="p-4 border-t border-circle-border bg-circle-bg/50">
         <form onSubmit={handleSend} className="relative flex items-center">
+          <label htmlFor="ai-message" className="sr-only">
+            {t("ai.placeholder")}
+          </label>
           <input
+            id="ai-message"
+            name="message"
             type="text"
+            autoComplete="off"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={t("ai.placeholder")}
-            className="w-full bg-circle-card border border-circle-border rounded-full py-4 pl-6 pr-14 text-sm text-circle-text placeholder-circle-frost/30 focus:outline-none focus:border-circle-teal transition-colors"
+            className="w-full bg-circle-card border border-circle-border rounded-full py-4 pl-6 pr-14 text-sm text-circle-text placeholder-circle-frost/60 focus:border-circle-teal transition-colors"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
+            aria-label={t("ai.title")}
             className="absolute right-2 w-10 h-10 bg-circle-amber text-[#081c1b] rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
           >
-            <Send size={18} className="ml-[-2px]" />
+            <Send size={18} aria-hidden="true" className="ml-[-2px]" />
           </button>
         </form>
       </div>

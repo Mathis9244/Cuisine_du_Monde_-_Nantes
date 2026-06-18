@@ -104,19 +104,28 @@ export default function AdminPage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center text-circle-text/40 font-black uppercase tracking-[0.4em]">
-        {t("loading")}
-      </div>
+      <main
+        id="contenu-principal"
+        tabIndex={-1}
+        className="min-h-screen flex items-center justify-center text-circle-text/80 font-black uppercase tracking-[0.4em]"
+      >
+        <h1 className="sr-only">{t("admin.title")}</h1>
+        <p role="status">{t("loading")}</p>
+      </main>
     );
   }
 
   if (status === "forbidden") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-6 text-center">
+      <main
+        id="contenu-principal"
+        tabIndex={-1}
+        className="min-h-screen flex flex-col items-center justify-center gap-6 p-6 text-center"
+      >
         <h1 className="text-4xl font-black uppercase tracking-tighter text-circle-amber">
           {t("admin.forbidden.title")}
         </h1>
-        <p className="text-circle-text/40 max-w-md">
+        <p className="text-circle-text/80 max-w-md">
           {t("admin.forbidden.body")}
         </p>
         <Link
@@ -125,39 +134,50 @@ export default function AdminPage() {
         >
           {t("admin.back")}
         </Link>
-      </div>
+      </main>
     );
   }
 
   return (
     <div className="min-h-screen bg-circle-bg text-circle-text font-sans">
-      <nav className="sticky top-0 z-50 bg-circle-bg/80 backdrop-blur-2xl border-b border-circle-border px-4 md:px-8 h-20 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-circle-bg/80 backdrop-blur-2xl border-b border-circle-border px-4 md:px-8 h-20 flex items-center justify-between">
         <Link
           href="/"
           className="flex items-center gap-2 px-3 py-2 bg-circle-text/5 border border-circle-text/10 rounded-xl hover:bg-circle-text/10 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={16} aria-hidden="true" />
           <span>{t("admin.back")}</span>
         </Link>
-        <span className="font-black uppercase tracking-widest text-circle-amber">
+        <h1 className="font-black uppercase tracking-widest text-circle-amber">
           {t("admin.title")}
-        </span>
+        </h1>
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
           href="/api/admin/restaurants/export/csv"
           className="flex items-center gap-2 px-4 py-2 bg-circle-teal text-[#081c1b] rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest"
         >
-          <Download size={16} /> CSV
+          <Download size={16} aria-hidden="true" /> CSV
         </a>
-      </nav>
+      </header>
 
-      <main className="container mx-auto max-w-6xl py-10 px-4 md:px-8 space-y-6">
+      <main
+        id="contenu-principal"
+        tabIndex={-1}
+        className="container mx-auto max-w-6xl py-10 px-4 md:px-8 space-y-6"
+      >
         <div className="flex flex-wrap items-center gap-4">
+          <label htmlFor="admin-search" className="sr-only">
+            {t("admin.search")}
+          </label>
           <input
+            id="admin-search"
+            name="search"
+            type="search"
+            autoComplete="off"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("admin.search")}
-            className="flex-1 min-w-[200px] px-5 py-3 bg-circle-card border border-circle-border rounded-2xl outline-none focus:border-circle-teal"
+            className="flex-1 min-w-[200px] px-5 py-3 bg-circle-card border border-circle-border rounded-2xl focus:border-circle-teal"
           />
           <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-circle-text/60">
             <input
@@ -167,13 +187,19 @@ export default function AdminPage() {
             />
             {t("admin.includeInactive")}
           </label>
-          <span className="text-xs text-circle-text/30 font-black uppercase tracking-widest">
+          <span
+            role="status"
+            className="text-xs text-circle-text/70 font-black uppercase tracking-widest"
+          >
             {t("admin.results", { count: restaurants.length })}
           </span>
         </div>
 
         {error && (
-          <div className="px-5 py-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-red-200 text-sm">
+          <div
+            role="alert"
+            className="px-5 py-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-red-200 text-sm"
+          >
             {error}
           </div>
         )}
@@ -188,24 +214,46 @@ export default function AdminPage() {
                   : "bg-circle-card/40 border-red-900/40"
               }`}
             >
+              <label className="sr-only" htmlFor={`restaurant-${r.id}-name`}>
+                Nom du restaurant
+              </label>
               <input
+                id={`restaurant-${r.id}-name`}
+                name={`restaurant-${r.id}-name`}
                 value={r.name ?? ""}
                 onChange={(e) => updateField(r.id, "name", e.target.value)}
                 className="md:col-span-3 px-3 py-2 bg-circle-bg border border-circle-border rounded-lg text-sm font-bold"
               />
+              <label className="sr-only" htmlFor={`restaurant-${r.id}-cuisine`}>
+                Cuisine
+              </label>
               <input
+                id={`restaurant-${r.id}-cuisine`}
+                name={`restaurant-${r.id}-cuisine`}
                 value={r.cuisine ?? ""}
                 onChange={(e) => updateField(r.id, "cuisine", e.target.value)}
                 placeholder={t("admin.ph.cuisine")}
                 className="md:col-span-2 px-3 py-2 bg-circle-bg border border-circle-border rounded-lg text-sm"
               />
+              <label className="sr-only" htmlFor={`restaurant-${r.id}-address`}>
+                Adresse
+              </label>
               <input
+                id={`restaurant-${r.id}-address`}
+                name={`restaurant-${r.id}-address`}
                 value={r.address ?? ""}
                 onChange={(e) => updateField(r.id, "address", e.target.value)}
                 placeholder={t("admin.ph.address")}
                 className="md:col-span-3 px-3 py-2 bg-circle-bg border border-circle-border rounded-lg text-sm"
               />
+              <label className="sr-only" htmlFor={`restaurant-${r.id}-phone`}>
+                Téléphone
+              </label>
               <input
+                id={`restaurant-${r.id}-phone`}
+                name={`restaurant-${r.id}-phone`}
+                type="tel"
+                autoComplete="off"
                 value={r.phone ?? ""}
                 onChange={(e) => updateField(r.id, "phone", e.target.value)}
                 placeholder={t("admin.ph.phone")}
@@ -213,14 +261,17 @@ export default function AdminPage() {
               />
               <div className="md:col-span-2 flex items-center gap-2 justify-end">
                 <button
+                  type="button"
                   onClick={() => save(r)}
                   disabled={savingId === r.id}
                   className="p-2 bg-circle-amber text-[#081c1b] rounded-lg disabled:opacity-50"
                   title={t("admin.save")}
+                  aria-label={`${t("admin.save")} ${r.name}`}
                 >
-                  <Save size={16} />
+                  <Save size={16} aria-hidden="true" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => toggleActive(r)}
                   className={`p-2 rounded-lg ${
                     r.is_active
@@ -228,8 +279,9 @@ export default function AdminPage() {
                       : "bg-green-500/20 text-green-300"
                   }`}
                   title={r.is_active ? t("admin.deactivate") : t("admin.activate")}
+                  aria-label={`${r.is_active ? t("admin.deactivate") : t("admin.activate")} ${r.name}`}
                 >
-                  <Power size={16} />
+                  <Power size={16} aria-hidden="true" />
                 </button>
               </div>
             </div>

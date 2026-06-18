@@ -4,6 +4,7 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Ban, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useAccessibleDialog } from "@/hooks";
 
 const MDiv = motion.div as any;
 
@@ -21,6 +22,7 @@ const ExcludeCountryPrompt: React.FC<ExcludeCountryPromptProps> = ({
   onDismiss,
 }) => {
   const { t } = useI18n();
+  const dialogRef = useAccessibleDialog<HTMLDivElement>(open, onDismiss);
 
   return (
     <AnimatePresence>
@@ -34,6 +36,12 @@ const ExcludeCountryPrompt: React.FC<ExcludeCountryPromptProps> = ({
             onClick={onDismiss}
           />
           <MDiv
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="exclude-dialog-title"
+            aria-describedby="exclude-dialog-description"
+            tabIndex={-1}
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.98 }}
@@ -45,17 +53,23 @@ const ExcludeCountryPrompt: React.FC<ExcludeCountryPromptProps> = ({
               className="absolute right-4 top-4 text-circle-frost/40 hover:text-circle-text"
               aria-label={t("rate.cancel")}
             >
-              <X size={18} />
+              <X size={18} aria-hidden="true" />
             </button>
 
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-circle-amber/10 text-circle-amber">
-              <Ban size={22} />
+              <Ban size={22} aria-hidden="true" />
             </div>
 
-            <h3 className="text-xl font-black uppercase tracking-tight text-circle-text">
+            <h2
+              id="exclude-dialog-title"
+              className="text-xl font-black uppercase tracking-tight text-circle-text"
+            >
               {t("exclude.title")}
-            </h3>
-            <p className="mt-3 text-sm leading-relaxed text-circle-frost/65">
+            </h2>
+            <p
+              id="exclude-dialog-description"
+              className="mt-3 text-sm leading-relaxed text-circle-frost/80"
+            >
               {t("exclude.lead", { country })}
             </p>
 

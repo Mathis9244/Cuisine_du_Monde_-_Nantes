@@ -4,7 +4,6 @@ import React, { useRef, useEffect, useState } from "react";
 
 interface NavItem {
   label: string;
-  href: string;
 }
 
 interface GooeyNavProps {
@@ -119,14 +118,11 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
     };
     Object.assign(filterRef.current.style, styles);
     Object.assign(textRef.current.style, styles);
-    textRef.current.innerText = (
-      element.querySelector("a") as HTMLElement
-    ).innerText;
+    textRef.current.innerText =
+      (element.querySelector("button") as HTMLElement | null)?.innerText ?? "";
   };
 
-  const handleClick = (e: React.MouseEvent, index: number) => {
-    e.preventDefault();
-    const liEl = e.currentTarget as HTMLElement;
+  const handleClick = (liEl: HTMLElement, index: number) => {
     if (activeIndex === index) return;
 
     setActiveIndex(index);
@@ -173,21 +169,28 @@ const GooeyNav: React.FC<GooeyNavProps> = ({
 
   return (
     <div className="gooey-nav-container" ref={containerRef}>
-      <nav>
+      <nav aria-label="Navigation principale">
         <ul ref={navRef}>
           {items.map((item, index) => (
             <li
               key={index}
               className={activeIndex === index ? "active" : ""}
-              onClick={(e) => handleClick(e, index)}
             >
-              <a href={item.href}>{item.label}</a>
+              <button
+                type="button"
+                aria-current={activeIndex === index ? "page" : undefined}
+                onClick={(event) =>
+                  handleClick(event.currentTarget.parentElement!, index)
+                }
+              >
+                {item.label}
+              </button>
             </li>
           ))}
         </ul>
       </nav>
-      <span className="effect filter" ref={filterRef} />
-      <span className="effect text active" ref={textRef} />
+      <span aria-hidden="true" className="effect filter" ref={filterRef} />
+      <span aria-hidden="true" className="effect text active" ref={textRef} />
     </div>
   );
 };

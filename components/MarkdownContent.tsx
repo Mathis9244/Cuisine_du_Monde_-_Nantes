@@ -35,7 +35,8 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
             <a
               href={href}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
+              aria-label={`${String(children)} (nouvelle fenêtre)`}
               className="font-black text-circle-amber underline decoration-circle-amber/50 underline-offset-4 hover:decoration-circle-amber"
             >
               {children}
@@ -70,30 +71,36 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
               </code>
             ),
           h1: ({ children }) => (
-            <h1 className="my-0 text-xl font-black uppercase tracking-tight text-circle-text">
-              {children}
-            </h1>
-          ),
-          h2: ({ children }) => (
-            <h2 className="my-0 text-lg font-black uppercase tracking-tight text-circle-text">
-              {children}
-            </h2>
-          ),
-          h3: ({ children }) => (
-            <h3 className="my-0 text-base font-black uppercase tracking-tight text-circle-text">
+            <h3 className="my-0 text-xl font-black uppercase tracking-tight text-circle-text">
               {children}
             </h3>
+          ),
+          h2: ({ children }) => (
+            <h4 className="my-0 text-lg font-black uppercase tracking-tight text-circle-text">
+              {children}
+            </h4>
+          ),
+          h3: ({ children }) => (
+            <h5 className="my-0 text-base font-black uppercase tracking-tight text-circle-text">
+              {children}
+            </h5>
           ),
           hr: () => <hr className="my-0 border-circle-border/70" />,
           table: ({ children }) => (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm text-circle-frost/90">
+              <table
+                aria-label="Données de la réponse"
+                className="w-full border-collapse text-sm text-circle-frost/90"
+              >
                 {children}
               </table>
             </div>
           ),
           th: ({ children }) => (
-            <th className="border border-circle-border bg-circle-bg/70 px-3 py-2 text-left font-black text-circle-text">
+            <th
+              scope="col"
+              className="border border-circle-border bg-circle-bg/70 px-3 py-2 text-left font-black text-circle-text"
+            >
               {children}
             </th>
           ),

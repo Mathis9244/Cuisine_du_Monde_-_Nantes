@@ -125,21 +125,11 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
 
         <MDiv
           animate={controls}
-          role="button"
-          tabIndex={0}
-          aria-label={t("wheel.spin")}
-          aria-disabled={!canSpin}
-          onClick={spinWheel}
-          onKeyDown={(e: React.KeyboardEvent) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              void spinWheel();
-            }
-          }}
-          className={`relative aspect-square w-full touch-manipulation rounded-full outline-none transition-shadow ${
+          aria-hidden="true"
+          className={`relative aspect-square w-full rounded-full transition-shadow ${
             canSpin
-              ? "cursor-pointer active:scale-[0.99]"
-              : "cursor-not-allowed"
+              ? "active:scale-[0.99]"
+              : ""
           }`}
           style={{ transformOrigin: "50% 50%" }}
         >
@@ -256,6 +246,8 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
       <div className="mt-6 flex min-h-[3.5rem] items-center justify-center sm:mt-8">
         {winner ? (
           <MDiv
+            role="status"
+            aria-live="polite"
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
@@ -268,7 +260,11 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
             </p>
           </MDiv>
         ) : isSpinning ? (
-          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-circle-frost/35">
+          <p
+            role="status"
+            aria-live="polite"
+            className="text-[10px] font-black uppercase tracking-[0.35em] text-circle-frost/70"
+          >
             {t("wheel.spinning")}
           </p>
         ) : null}
@@ -284,7 +280,11 @@ const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({
             : "cursor-not-allowed bg-circle-border text-circle-text/20"
         }`}
       >
-        <Compass size={16} className={isSpinning ? "animate-spin" : ""} />
+        <Compass
+          size={16}
+          aria-hidden="true"
+          className={isSpinning ? "animate-spin" : ""}
+        />
         {isSpinning ? t("wheel.spinning") : t("wheel.spin")}
       </button>
     </div>

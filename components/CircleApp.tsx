@@ -38,6 +38,7 @@ import {
   useRestaurantStats,
   useExplorerPreferences,
   useMapFilters,
+  useAccessibleDialog,
   ViewMode,
   FeedFilter,
   ExplorerSort,
@@ -119,6 +120,27 @@ const CircleApp: React.FC = () => {
 
   // Authentication
   const { user, logout, updateUser } = useAuth();
+  const closeAuthDialog = useCallback(() => setAuthOpen(false), [setAuthOpen]);
+  const closeRatingDialog = useCallback(
+    () => setRatingTarget(null),
+    [setRatingTarget],
+  );
+  const closeMobileNav = useCallback(
+    () => setMobileNavOpen(false),
+    [setMobileNavOpen],
+  );
+  const authDialogRef = useAccessibleDialog<HTMLDivElement>(
+    state.authOpen,
+    closeAuthDialog,
+  );
+  const ratingDialogRef = useAccessibleDialog<HTMLDivElement>(
+    Boolean(state.ratingTarget),
+    closeRatingDialog,
+  );
+  const mobileNavRef = useAccessibleDialog<HTMLElement>(
+    state.mobileNavOpen,
+    closeMobileNav,
+  );
 
   // Data fetching hooks
   const { restaurants: featuredRestaurants, loading: featuredLoading } =
@@ -658,45 +680,79 @@ const CircleApp: React.FC = () => {
   const authFormContent = (
     <form onSubmit={handleLogin} className="space-y-6">
       {authError && (
-        <div className="px-5 py-4 bg-red-500/10 border border-red-500/30 rounded-3xl text-red-200 text-xs font-bold tracking-widest">
+        <div
+          id="auth-error"
+          role="alert"
+          className="px-5 py-4 bg-red-500/10 border border-red-500/30 rounded-3xl text-red-200 text-xs font-bold tracking-widest"
+        >
           {authError}
         </div>
       )}
       {state.authMode === "join" && (
+        <label className="block space-y-2">
+          <span className="text-xs font-black uppercase tracking-widest">
+            {t("auth.name")}
+          </span>
+          <input
+            required
+            id="auth-username"
+            name="username"
+            type="text"
+            autoComplete="username"
+            spellCheck={false}
+            aria-describedby={authError ? "auth-error" : undefined}
+            value={authForm.username}
+            onChange={(e) =>
+              setAuthForm({ ...authForm, username: e.target.value })
+            }
+            className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl focus:border-circle-teal text-lg font-bold text-circle-text uppercase tracking-widest"
+          />
+        </label>
+      )}
+      <label className="block space-y-2">
+        <span className="text-xs font-black uppercase tracking-widest">
+          {t("auth.email")}
+        </span>
         <input
           required
-          type="text"
-          placeholder={t("auth.name")}
-          value={authForm.username}
-          onChange={(e) =>
-            setAuthForm({ ...authForm, username: e.target.value })
-          }
-          className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
+          id="auth-email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          spellCheck={false}
+          aria-describedby={authError ? "auth-error" : undefined}
+          value={authForm.email}
+          onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+          className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl focus:border-circle-teal text-lg font-bold text-circle-text uppercase tracking-widest"
         />
-      )}
-      <input
-        required
-        type="email"
-        placeholder={t("auth.email")}
-        value={authForm.email}
-        onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-        className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
-      />
-      <input
-        required
-        type="password"
-        placeholder={t("auth.password")}
-        value={authForm.password}
-        onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-        className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl outline-none focus:border-circle-teal text-lg font-bold text-circle-text placeholder-circle-text/20 uppercase tracking-widest"
-      />
+      </label>
+      <label className="block space-y-2">
+        <span className="text-xs font-black uppercase tracking-widest">
+          {t("auth.password")}
+        </span>
+        <input
+          required
+          id="auth-password"
+          name="password"
+          type="password"
+          autoComplete={
+            state.authMode === "login" ? "current-password" : "new-password"
+          }
+          aria-describedby={authError ? "auth-error" : undefined}
+          value={authForm.password}
+          onChange={(e) =>
+            setAuthForm({ ...authForm, password: e.target.value })
+          }
+          className="w-full px-6 py-5 bg-circle-card border border-circle-border rounded-3xl focus:border-circle-teal text-lg font-bold text-circle-text uppercase tracking-widest"
+        />
+      </label>
       <button
         type="submit"
         disabled={authLoading}
         className="w-full bg-circle-amber text-[#081c1b] py-5 rounded-3xl font-black text-sm uppercase tracking-[0.3em] active:scale-[0.97] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {authLoading
-          ? "..."
+          ? t("loading")
           : state.authMode === "login"
             ? t("auth.enter")
             : t("auth.join")}
@@ -717,7 +773,11 @@ const CircleApp: React.FC = () => {
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="min-h-screen bg-circle-bg flex items-center justify-center p-6 font-sans">
+      <main
+        id="contenu-principal"
+        tabIndex={-1}
+        className="min-h-screen bg-circle-bg flex items-center justify-center p-6 font-sans"
+      >
         <div className="w-full max-w-lg bg-circle-card border border-circle-border rounded-[2rem] p-10 space-y-6">
           <h1 className="text-3xl font-black text-circle-amber uppercase tracking-tighter">
             {t("setup.title")}
@@ -732,20 +792,22 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
           </pre>
           <p className="text-circle-frost/40 text-xs">{t("setup.hint")}</p>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
     <div className="min-h-screen bg-circle-bg text-circle-text font-sans selection:bg-circle-amber selection:text-[#081c1b]">
-      <nav className="sticky top-0 z-50 bg-circle-bg/85 backdrop-blur-2xl border-b border-circle-border px-4 md:px-8 h-16 md:h-20 flex items-center justify-between gap-3">
+      <header
+        className="sticky top-0 z-50 bg-circle-bg/85 backdrop-blur-2xl border-b border-circle-border px-4 md:px-8 h-16 md:h-20 flex items-center justify-between gap-3"
+      >
         <div className="flex items-center min-w-[120px] shrink-0">
           {isAtHome ? (
-            <div className="cursor-pointer" onClick={() => handleNav(0)}>
+            <button type="button" onClick={() => handleNav(0)}>
               <span className="font-black text-sm md:text-lg uppercase tracking-[0.28em] text-circle-amber">
                 {APP_NAME}
               </span>
-            </div>
+            </button>
           ) : (
             <button
               onClick={() => {
@@ -754,7 +816,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               }}
               className="flex items-center gap-2 px-3 py-2 bg-circle-text/5 border border-circle-text/10 rounded-xl hover:bg-circle-text/10 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest"
             >
-              <ArrowLeft size={16} />
+              <ArrowLeft size={16} aria-hidden="true" />
               <span className="hidden sm:inline">{t("nav.return")}</span>
             </button>
           )}
@@ -769,12 +831,12 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   : state.currentView
               }
               items={[
-                { label: t("nav.feed"), href: "#" },
-                { label: t("nav.map"), href: "#" },
-                { label: t("nav.spin"), href: "#" },
-                { label: t("nav.wheel"), href: "#" },
-                { label: t("nav.ai"), href: "#" },
-                { label: t("nav.you"), href: "#" },
+                { label: t("nav.feed") },
+                { label: t("nav.map") },
+                { label: t("nav.spin") },
+                { label: t("nav.wheel") },
+                { label: t("nav.ai") },
+                { label: t("nav.you") },
               ]}
               onNav={handleNav}
               initialActiveIndex={
@@ -798,8 +860,9 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 href="/admin"
                 className="text-circle-frost/40 hover:text-circle-amber transition-colors p-2"
                 title={t("nav.admin")}
+                aria-label={t("nav.admin")}
               >
-                <Shield size={20} />
+                <Shield size={20} aria-hidden="true" />
               </Link>
             )}
             <LanguageToggle />
@@ -811,22 +874,23 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               title={t("share.title")}
               aria-label={t("share.title")}
             >
-              <Share2 size={20} />
+              <Share2 size={20} aria-hidden="true" />
             </button>
             {user ? (
               <button
                 onClick={handleLogout}
                 className="text-circle-frost/40 hover:text-circle-text transition-colors p-2"
                 title={t("auth.toLogin")}
+                aria-label={t("profile.logout")}
               >
-                <LogOut size={20} />
+                <LogOut size={20} aria-hidden="true" />
               </button>
             ) : (
               <button
                 onClick={() => setAuthOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-circle-amber text-[#081c1b] rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-circle-honey transition-all"
               >
-                <LogIn size={16} />
+                <LogIn size={16} aria-hidden="true" />
                 <span className="hidden sm:inline">{t("auth.enter")}</span>
               </button>
             )}
@@ -839,7 +903,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             aria-label={t("share.title")}
             title={t("share.title")}
           >
-            <Share2 size={18} />
+            <Share2 size={18} aria-hidden="true" />
           </button>
 
           <button
@@ -851,10 +915,14 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             aria-expanded={state.mobileNavOpen}
             onClick={() => setMobileNavOpen(!state.mobileNavOpen)}
           >
-            {state.mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+            {state.mobileNavOpen ? (
+              <X size={18} aria-hidden="true" />
+            ) : (
+              <Menu size={18} aria-hidden="true" />
+            )}
           </button>
         </div>
-      </nav>
+      </header>
 
       <AnimatePresence>
         {state.mobileNavOpen && (
@@ -869,6 +937,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               onClick={() => setMobileNavOpen(false)}
             />
             <motion.aside
+              ref={mobileNavRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Navigation mobile"
+              tabIndex={-1}
               className="fixed right-0 top-0 bottom-0 z-50 w-[min(88vw,22rem)] rounded-l-[2rem] border-l border-y border-circle-border bg-circle-bg shadow-2xl shadow-black/30 p-5 lg:hidden overflow-y-auto"
               initial={{ x: 32, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -890,7 +963,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   aria-label="Fermer le menu"
                   onClick={() => setMobileNavOpen(false)}
                 >
-                  <X size={18} />
+                  <X size={18} aria-hidden="true" />
                 </button>
               </div>
 
@@ -926,12 +999,13 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                           ? "border-circle-amber/60 bg-circle-amber/10 text-circle-amber"
                           : "border-circle-border bg-circle-card/70 text-circle-text/80 hover:border-circle-frost/30 hover:bg-circle-card"
                       }`}
+                      aria-current={active ? "page" : undefined}
                     >
                       <span className="text-sm font-black uppercase tracking-[0.28em]">
                         {item.label}
                       </span>
                       <span className="text-[10px] uppercase tracking-[0.35em] text-circle-frost/40">
-                        {active ? "Current" : "Open"}
+                        {active ? "Actuel" : "Ouvrir"}
                       </span>
                     </button>
                   );
@@ -955,7 +1029,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-circle-border bg-circle-bg/70 text-circle-frost/60"
                       aria-label={t("share.title")}
                     >
-                      <Share2 size={16} />
+                      <Share2 size={16} aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -966,7 +1040,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       className="flex items-center justify-center gap-2 rounded-xl border border-circle-border bg-circle-bg/70 px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/70"
                       onClick={() => setMobileNavOpen(false)}
                     >
-                      <Shield size={14} />
+                      <Shield size={14} aria-hidden="true" />
                       Admin
                     </Link>
                   )}
@@ -978,7 +1052,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       }}
                       className="flex items-center justify-center gap-2 rounded-xl bg-circle-text px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-bg"
                     >
-                      <LogOut size={14} />
+                      <LogOut size={14} aria-hidden="true" />
                       Logout
                     </button>
                   ) : (
@@ -989,7 +1063,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       }}
                       className="flex items-center justify-center gap-2 rounded-xl bg-circle-amber px-3 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-[#081c1b]"
                     >
-                      <LogIn size={14} />
+                      <LogIn size={14} aria-hidden="true" />
                       Login
                     </button>
                   )}
@@ -1000,7 +1074,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
         )}
       </AnimatePresence>
 
-      <main className="container mx-auto max-w-5xl pt-8 md:pt-16 pb-24 md:pb-32 px-4 md:px-8">
+      <main
+        id="contenu-principal"
+        tabIndex={-1}
+        className="container mx-auto max-w-5xl pt-8 md:pt-16 pb-24 md:pb-32 px-4 md:px-8"
+      >
         <AnimatePresence mode="wait" initial={false}>
           {state.currentView === "feed" && (
             <MDiv
@@ -1036,38 +1114,44 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
               <div className="space-y-12">
                 <div className="max-w-3xl mx-auto pt-4">
-                  <div className="relative group">
+                  <form
+                    role="search"
+                    aria-label={t("feed.search")}
+                    className="relative group"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      setFeedSearchQuery(state.feedSearchDraft.trim());
+                    }}
+                  >
+                    <label htmlFor="feed-search" className="sr-only">
+                      {t("feed.search")}
+                    </label>
                     <Search
+                      aria-hidden="true"
                       className="absolute left-8 top-1/2 -translate-y-1/2 text-circle-teal/40"
                       size={24}
                     />
                     <input
-                      type="text"
+                      id="feed-search"
+                      name="search"
+                      type="search"
+                      autoComplete="off"
                       placeholder={t("feed.search")}
                       value={state.feedSearchDraft}
                       onChange={(e) => setFeedSearchDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === " " || e.key === "Enter") {
-                          e.preventDefault();
-                          setFeedSearchQuery(state.feedSearchDraft.trim());
-                        }
-                      }}
-                      className="w-full pl-20 pr-32 py-8 bg-circle-card border border-circle-border rounded-[2.5rem] focus:border-circle-teal transition-all text-2xl font-black text-circle-text placeholder-circle-frost/10 uppercase tracking-widest outline-none"
+                      className="w-full pl-20 pr-36 py-8 bg-circle-card border border-circle-border rounded-[2.5rem] focus:border-circle-teal transition-colors text-2xl font-black text-circle-text placeholder-circle-frost/50 uppercase tracking-widest"
                     />
                     <button
-                      type="button"
-                      onClick={() =>
-                        setFeedSearchQuery(state.feedSearchDraft.trim())
-                      }
+                      type="submit"
                       className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full border border-circle-border bg-circle-bg/70 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-circle-text/70 hover:text-circle-amber transition-colors"
                     >
-                      Go
+                      Rechercher
                     </button>
-                  </div>
+                  </form>
 
                   <div className="mt-4 space-y-3">
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-                      <SlidersHorizontal size={14} />
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/75">
+                      <SlidersHorizontal size={14} aria-hidden="true" />
                       <span>{t("feed.filters")}</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1085,6 +1169,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                             onClick={() =>
                               setFeedFilter(item.key as FeedFilter)
                             }
+                            aria-pressed={active}
                             className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
                               active
                                 ? "border-circle-amber/50 bg-circle-amber text-[#081c1b]"
@@ -1099,6 +1184,12 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   </div>
                 </div>
 
+                <p className="sr-only" role="status" aria-live="polite">
+                  {initialFeedLoading
+                    ? t("loading")
+                    : `${filteredRestaurants.length} restaurant(s) affiché(s)`}
+                </p>
+
                 <div className="border-t border-circle-border" />
               </div>
 
@@ -1111,7 +1202,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-circle-amber/10 border border-circle-amber/30 text-circle-amber font-black text-[10px] uppercase tracking-[0.3em] hover:bg-circle-amber/20 transition-colors"
                     >
                       {t("feed.clearFilter", { cuisine: state.viewAllCountry })}
-                      <X size={14} />
+                      <X size={14} aria-hidden="true" />
                     </button>
                   </div>
                 )}
@@ -1123,7 +1214,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     {feedError}
                   </p>
                 ) : feedRestaurants.length === 0 ? (
-                  <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-24">
+                  <p className="text-center text-circle-text/70 font-black uppercase tracking-[0.4em] py-24">
                     {t("feed.empty")}
                   </p>
                 ) : (
@@ -1137,7 +1228,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 )}
 
                 {feedLoadingMore && (
-                  <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-8">
+                  <p className="text-center text-circle-text/70 font-black uppercase tracking-[0.4em] py-8">
                     {t("feed.loadingMore")}
                   </p>
                 )}
@@ -1164,7 +1255,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             >
               <section className="space-y-8">
                 <div className="max-w-4xl mx-auto text-center space-y-4">
-                  <p className="text-[10px] uppercase tracking-[0.45em] font-black text-circle-frost/35">
+                  <p className="text-[10px] uppercase tracking-[0.45em] font-black text-circle-frost/75">
                     {t("feed.heroPrimary")}
                   </p>
                   <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter">
@@ -1177,16 +1268,19 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
 
                 <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_1fr]">
                   <label className="space-y-2 md:col-span-2">
-                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/75">
                       {t("feed.search")}
                     </span>
                     <div className="flex gap-2">
                       <input
-                        type="text"
+                        id="explorer-search"
+                        name="explorer-search"
+                        type="search"
+                        autoComplete="off"
                         value={state.explorerSearchDraft}
                         onChange={(e) => setExplorerSearchDraft(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === " " || e.key === "Enter") {
+                          if (e.key === "Enter") {
                             e.preventDefault();
                             setExplorerSearchQuery(
                               state.explorerSearchDraft.trim(),
@@ -1194,7 +1288,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                           }
                         }}
                         placeholder={t("feed.search")}
-                        className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
+                        className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold focus:border-circle-amber"
                       />
                       <button
                         type="button"
@@ -1205,12 +1299,12 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                         }
                         className="rounded-2xl border border-circle-border bg-circle-card px-4 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-circle-frost/70 hover:text-circle-amber transition-colors"
                       >
-                        Go
+                        Rechercher
                       </button>
                     </div>
                   </label>
                   <label className="space-y-2">
-                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/75">
                       Cuisine
                     </span>
                     <select
@@ -1218,7 +1312,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                       onChange={(e) =>
                         updateExplorerPrefs({ cuisine: e.target.value })
                       }
-                      className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
+                      className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold focus:border-circle-amber"
                     >
                       <option value="">{t("feed.filter.all")}</option>
                       {cuisineOptions.map((country) => (
@@ -1229,11 +1323,12 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     </select>
                   </label>
                   <label className="space-y-2">
-                    <span className="flex items-center justify-between text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                    <span className="flex items-center justify-between text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/75">
                       <span>Note min.</span>
                       <span>{explorerPrefs.minRating.toFixed(1)}</span>
                     </span>
                     <input
+                      name="explorer-min-rating"
                       type="range"
                       min={0}
                       max={5}
@@ -1248,7 +1343,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+                    <span className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/75">
                       Tri
                     </span>
                     <select
@@ -1258,7 +1353,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                           sortBy: e.target.value as ExplorerSort,
                         })
                       }
-                      className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold outline-none focus:border-circle-amber"
+                      className="w-full rounded-2xl border border-circle-border bg-circle-bg/60 px-4 py-3 text-sm font-bold focus:border-circle-amber"
                     >
                       <option value="rating">{t("feed.filter.top")}</option>
                       <option value="newest">Nouveautés</option>
@@ -1270,10 +1365,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                   <button
                     type="button"
                     onClick={() =>
-                      updateExplorerPrefs({
-                        hasWebsite: !explorerPrefs.hasWebsite,
-                      })
-                    }
+                        updateExplorerPrefs({
+                          hasWebsite: !explorerPrefs.hasWebsite,
+                        })
+                      }
+                      aria-pressed={explorerPrefs.hasWebsite}
                     className={`rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
                       explorerPrefs.hasWebsite
                         ? "border-circle-amber/50 bg-circle-amber text-[#081c1b]"
@@ -1306,6 +1402,11 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                     isFiltered
                   />
                 )}
+                <p className="sr-only" role="status" aria-live="polite">
+                  {explorerLoading
+                    ? t("loading")
+                    : `${explorerResults.length} restaurant(s) affiché(s)`}
+                </p>
               </section>
             </MDiv>
           )}
@@ -1319,7 +1420,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
             >
               <section className="space-y-6 px-4 sm:space-y-8 sm:px-6">
                 <div className="max-w-4xl mx-auto text-center space-y-4">
-                  <p className="text-[10px] uppercase tracking-[0.45em] font-black text-circle-frost/35">
+                  <p className="text-[10px] uppercase tracking-[0.45em] font-black text-circle-frost/75">
                     {t("nav.wheel")}
                   </p>
                   <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter">
@@ -1333,7 +1434,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
                 {wheelLoading ? (
                   <RestaurantListSkeleton count={1} />
                 ) : wheelCountries.length === 0 ? (
-                  <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-24">
+                  <p className="text-center text-circle-text/70 font-black uppercase tracking-[0.4em] py-24">
                     {t("home.empty")}
                   </p>
                 ) : (
@@ -1452,7 +1553,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
         </AnimatePresence>
       </main>
 
-      <footer className="py-24 border-t border-circle-border text-center opacity-20 hover:opacity-100 transition-opacity">
+      <footer className="py-24 border-t border-circle-border text-center text-circle-frost/70">
         <p className="text-[10px] font-black uppercase tracking-[0.6em]">
           {APP_NAME}
         </p>
@@ -1475,13 +1576,29 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               className="absolute inset-0 bg-black/95 backdrop-blur-xl"
             />
             <MDiv
+              ref={authDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="auth-dialog-title"
+              tabIndex={-1}
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               className="relative w-full max-w-sm bg-circle-card border border-circle-border rounded-[3rem] p-10"
             >
+              <button
+                type="button"
+                onClick={closeAuthDialog}
+                aria-label={t("rate.cancel")}
+                className="absolute right-5 top-5 inline-flex h-10 w-10 items-center justify-center rounded-full border border-circle-border bg-circle-bg text-circle-text"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-black text-circle-amber uppercase tracking-tighter">
+                <h2
+                  id="auth-dialog-title"
+                  className="text-3xl font-black text-circle-amber uppercase tracking-tighter"
+                >
                   {APP_NAME}
                 </h2>
                 <p className="text-circle-frost/40 text-xs font-black uppercase tracking-[0.3em] mt-2">
@@ -1502,14 +1619,22 @@ SUPABASE_SERVICE_ROLE_KEY="eyJ..."`}
               className="absolute inset-0 bg-black/95 backdrop-blur-xl"
             />
             <MDiv
+              ref={ratingDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rating-dialog-title"
+              tabIndex={-1}
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               className="relative w-full max-w-sm bg-circle-card border border-circle-border rounded-[3rem] p-12 text-center"
             >
-              <h3 className="text-3xl font-black mb-4 uppercase tracking-tighter text-circle-amber">
+              <h2
+                id="rating-dialog-title"
+                className="text-3xl font-black mb-4 uppercase tracking-tighter text-circle-amber"
+              >
                 {t("rate.title")}
-              </h3>
+              </h2>
               <p className="text-circle-frost/40 text-xs font-black mb-10 uppercase tracking-widest">
                 {state.ratingTarget.name}
               </p>

@@ -131,7 +131,7 @@ function ClusteredMarkers({
             <p style="margin:4px 0 0;font-size:11px;opacity:0.6">${escapeHtml(r.country)} · ${escapeHtml(r.specialty)}</p>
             <div style="display:flex;gap:8px;margin-top:10px">
               <button type="button" data-rate-id="${escapeHtml(r.id)}" style="flex:1;padding:8px;border:none;border-radius:8px;background:#ff9f1c;color:#081c1b;font-weight:700;font-size:11px;cursor:pointer;text-transform:uppercase">${escapeHtml(rateLabelRef.current)}</button>
-              <a href="${mapUrl}" target="_blank" rel="noopener noreferrer" style="padding:8px 12px;border-radius:8px;background:#2ec4b6;color:#fff;font-size:11px;font-weight:700;text-decoration:none">${escapeHtml(directionsLabelRef.current)}</a>
+              <a href="${mapUrl}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(directionsLabelRef.current)} : ${escapeHtml(r.name)} (nouvelle fenêtre)" style="padding:8px 12px;border-radius:8px;background:#2ec4b6;color:#081c1b;font-size:11px;font-weight:700;text-decoration:underline">${escapeHtml(directionsLabelRef.current)}</a>
             </div>
           </div>
         `);
@@ -238,7 +238,10 @@ const MapView: React.FC<MapViewProps> = ({
 
   if (loading) {
     return (
-      <p className="text-center text-circle-frost/30 font-black uppercase tracking-[0.4em] py-24">
+      <p
+        role="status"
+        className="text-center text-circle-frost/70 font-black uppercase tracking-[0.4em] py-24"
+      >
         {t("map.loading")}
       </p>
     );
@@ -270,9 +273,10 @@ const MapView: React.FC<MapViewProps> = ({
               {t("map.filters")}
             </span>
             <select
+              name="map-cuisine"
               value={filters.cuisine}
               onChange={(e) => onFiltersChange({ cuisine: e.target.value })}
-              className="mt-2 w-full bg-transparent text-sm font-bold outline-none"
+              className="mt-2 w-full bg-circle-bg text-circle-text text-sm font-bold"
             >
               <option value="">{t("feed.filter.all")}</option>
               {Array.from(new Set(restaurants.map((r) => r.country)))
@@ -291,6 +295,7 @@ const MapView: React.FC<MapViewProps> = ({
               <span>{filters.minRating.toFixed(1)}</span>
             </span>
             <input
+              name="map-min-rating"
               type="range"
               min={0}
               max={5}
@@ -308,13 +313,14 @@ const MapView: React.FC<MapViewProps> = ({
               {t("map.popularity")}
             </span>
             <select
+              name="map-sort"
               value={filters.sortBy}
               onChange={(e) =>
                 onFiltersChange({
                   sortBy: e.target.value as MapFilters["sortBy"],
                 })
               }
-              className="mt-2 w-full bg-transparent text-sm font-bold outline-none"
+              className="mt-2 w-full bg-circle-bg text-circle-text text-sm font-bold"
             >
               <option value="rating">{t("feed.filter.top")}</option>
               <option value="popular">{t("map.popularity")}</option>
@@ -340,7 +346,10 @@ const MapView: React.FC<MapViewProps> = ({
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center text-circle-frost/40 font-black uppercase tracking-[0.4em] py-24">
+        <p
+          role="status"
+          className="text-center text-circle-frost/70 font-black uppercase tracking-[0.4em] py-24"
+        >
           {t("feed.empty")}
         </p>
       ) : (
@@ -350,6 +359,7 @@ const MapView: React.FC<MapViewProps> = ({
             center={center}
             zoom={13}
             scrollWheelZoom
+            aria-label={t("map.title")}
             className="h-full w-full"
           >
             <TileLayer
@@ -365,6 +375,9 @@ const MapView: React.FC<MapViewProps> = ({
           </MapContainer>
         </div>
       )}
+      <p className="sr-only" role="status" aria-live="polite">
+        {t("map.count", { count: filtered.length })}
+      </p>
     </div>
   );
 };

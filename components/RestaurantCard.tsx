@@ -42,11 +42,16 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
       className="bg-circle-card rounded-[2rem] p-8 border border-circle-border transition-all flex flex-col group shadow-2xl"
     >
       <div className="flex justify-between items-start mb-6">
-        <h4 className="text-4xl font-black text-circle-text tracking-tighter uppercase leading-none">
+        <h3 className="text-4xl font-black text-circle-text tracking-tighter uppercase leading-none">
           {restaurant.name}
-        </h4>
+        </h3>
         <div className="flex items-center gap-1.5 bg-circle-bg border border-circle-border px-3 py-1.5 rounded-full">
-          <Star size={14} fill="#ff9f1c" className="text-circle-amber" />
+          <Star
+            size={14}
+            fill="#ff9f1c"
+            aria-hidden="true"
+            className="text-circle-amber"
+          />
           <span className="text-sm font-black text-circle-text">{avgRating}</span>
         </div>
       </div>
@@ -63,6 +68,7 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
               onClick={() =>
                 onProfileClick?.({ name: friend.name, avatar: friend.avatar })
               }
+              aria-label={`Voir le profil de ${friend.name}`}
               className="w-10 h-10 rounded-full border-2 border-circle-card bg-slate-800 transition-transform hover:scale-110 relative z-[1]"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -83,6 +89,7 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
 
       <div className="flex gap-3 mt-auto">
         <button
+          type="button"
           onClick={onRate}
           className="flex-1 bg-circle-amber text-[#081c1b] py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-circle-honey transition-all active:scale-95"
         >
@@ -92,10 +99,11 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
           href={mapUrl}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={`${t("card.maps")} : ${restaurant.name} (nouvelle fenêtre)`}
           className="flex items-center justify-center aspect-square bg-circle-teal text-circle-text p-4 rounded-2xl hover:bg-[#28b1a5] transition-all active:scale-95"
           title={t("card.maps")}
         >
-          <ExternalLink size={20} />
+          <ExternalLink size={20} aria-hidden="true" />
         </a>
       </div>
     </MDiv>

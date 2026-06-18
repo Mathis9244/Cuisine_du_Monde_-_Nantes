@@ -28,8 +28,8 @@ const HomeHero: React.FC<HomeHeroProps> = ({
     <section className="space-y-8 pb-4 md:pb-8">
       <div className="grid gap-5 lg:grid-cols-[1.35fr_0.9fr]">
         <header className="rounded-[2rem] border border-circle-border bg-circle-card/70 p-6 md:p-8 shadow-2xl shadow-black/10">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.45em] font-black text-circle-frost/35">
-            <Sparkles size={14} />
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.45em] font-black text-circle-frost/75">
+            <Sparkles size={14} aria-hidden="true" />
             <span>{t("home.subtitle")}</span>
           </div>
           <h1 className="mt-5 text-4xl md:text-6xl font-black tracking-tighter uppercase leading-[0.95] max-w-xl">
@@ -45,7 +45,7 @@ const HomeHero: React.FC<HomeHeroProps> = ({
               onClick={onOpenExplorer}
               className="inline-flex items-center gap-2 rounded-full bg-circle-amber px-5 py-3 text-[10px] md:text-xs font-black uppercase tracking-[0.35em] text-[#081c1b] hover:bg-circle-honey transition-colors"
             >
-              <Search size={14} />
+              <Search size={14} aria-hidden="true" />
               {t("feed.heroPrimary")}
             </button>
             <button
@@ -53,7 +53,7 @@ const HomeHero: React.FC<HomeHeroProps> = ({
               onClick={onOpenMap}
               className="inline-flex items-center gap-2 rounded-full border border-circle-border bg-circle-bg/60 px-5 py-3 text-[10px] md:text-xs font-black uppercase tracking-[0.35em] text-circle-text/80 hover:border-circle-amber/40 hover:text-circle-amber transition-colors"
             >
-              <MapPin size={14} />
+              <MapPin size={14} aria-hidden="true" />
               {t("feed.heroSecondary")}
             </button>
             <button
@@ -61,7 +61,7 @@ const HomeHero: React.FC<HomeHeroProps> = ({
               onClick={onOpenWheel}
               className="inline-flex items-center gap-2 rounded-full border border-circle-border bg-circle-card px-5 py-3 text-[10px] md:text-xs font-black uppercase tracking-[0.35em] text-circle-frost/70 hover:text-circle-text transition-colors"
             >
-              <Compass size={14} />
+              <Compass size={14} aria-hidden="true" />
               {t("feed.heroWheel")}
             </button>
             <button
@@ -69,7 +69,7 @@ const HomeHero: React.FC<HomeHeroProps> = ({
               onClick={onJumpToSearch}
               className="inline-flex items-center gap-2 rounded-full border border-circle-border bg-circle-card px-5 py-3 text-[10px] md:text-xs font-black uppercase tracking-[0.35em] text-circle-frost/70 hover:text-circle-text transition-colors"
             >
-              <ArrowRight size={14} />
+              <ArrowRight size={14} aria-hidden="true" />
               {t("feed.heroTertiary")}
             </button>
           </div>
@@ -78,13 +78,13 @@ const HomeHero: React.FC<HomeHeroProps> = ({
         <aside className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-[2rem] border border-circle-border bg-circle-card/50 p-5">
-              <p className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+              <p className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/75">
                 Restaurants
               </p>
               <p className="mt-3 text-3xl font-black">{totalRestaurants}</p>
             </div>
             <div className="rounded-[2rem] border border-circle-border bg-circle-card/50 p-5">
-              <p className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
+              <p className="text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/75">
                 Cuisines
               </p>
               <p className="mt-3 text-3xl font-black">{cuisineCount}</p>

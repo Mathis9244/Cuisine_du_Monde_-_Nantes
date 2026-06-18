@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { APP_NAME } from "@/lib/constants";
+import { useAccessibleDialog } from "@/hooks";
 
 const MDiv = motion.div as any;
 
@@ -31,6 +32,7 @@ const ShareSheet: React.FC<ShareSheetProps> = ({
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [url, setUrl] = useState(shareUrl ?? "");
+  const dialogRef = useAccessibleDialog<HTMLDivElement>(open, onClose);
 
   useEffect(() => {
     if (open && typeof window !== "undefined") {
@@ -38,20 +40,6 @@ const ShareSheet: React.FC<ShareSheetProps> = ({
       setCopied(false);
     }
   }, [open, shareUrl]);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open, onClose]);
 
   const shareText = t("share.message", { app: shareTitle });
 
@@ -139,9 +127,11 @@ const ShareSheet: React.FC<ShareSheetProps> = ({
             aria-hidden
           />
           <MDiv
+            ref={dialogRef}
             role="dialog"
-            aria-modal
-            aria-label={t("share.title")}
+            aria-modal="true"
+            aria-labelledby="share-dialog-title"
+            tabIndex={-1}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
@@ -151,9 +141,12 @@ const ShareSheet: React.FC<ShareSheetProps> = ({
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-circle-border lg:hidden" />
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.35em] text-circle-frost/40">
+                <h2
+                  id="share-dialog-title"
+                  className="text-[10px] font-black uppercase tracking-[0.35em] text-circle-frost/70"
+                >
                   {t("share.title")}
-                </p>
+                </h2>
                 <p className="mt-1 text-sm font-bold text-circle-text">{shareTitle}</p>
               </div>
               <button
@@ -162,7 +155,7 @@ const ShareSheet: React.FC<ShareSheetProps> = ({
                 className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-circle-border bg-circle-bg/60 text-circle-frost/60"
                 aria-label={t("share.close")}
               >
-                <X size={18} />
+                <X size={18} aria-hidden="true" />
               </button>
             </div>
 
@@ -184,7 +177,7 @@ const ShareSheet: React.FC<ShareSheetProps> = ({
                         : "border-circle-border bg-circle-bg/40 text-circle-text/80 hover:border-circle-frost/25"
                     }`}
                   >
-                    <Icon size={20} />
+                    <Icon size={20} aria-hidden="true" />
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] leading-tight">
                       {action.label}
                     </span>
@@ -192,6 +185,9 @@ const ShareSheet: React.FC<ShareSheetProps> = ({
                 );
               })}
             </div>
+            <p className="sr-only" role="status" aria-live="polite">
+              {copied ? t("share.copied") : ""}
+            </p>
           </MDiv>
         </>
       )}

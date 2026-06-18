@@ -50,17 +50,21 @@ const StarRating: React.FC<StarRatingProps> = ({ restaurantId, onRate }) => {
           <button
             key={star}
             type="button"
+            disabled={!isLoggedIn}
+            aria-label={`Attribuer la note de ${star} sur 5`}
+            aria-pressed={rating === star}
             className={`transition-all duration-150 ${
               star <= (hover || rating)
                 ? "text-circle-amber scale-110"
                 : "text-circle-frost/10"
-            } ${isLoggedIn ? "cursor-pointer hover:scale-125" : "cursor-default"}`}
+            } ${isLoggedIn ? "cursor-pointer hover:scale-125" : "cursor-not-allowed opacity-60"}`}
             onClick={() => handleRate(star)}
             onMouseEnter={() => isLoggedIn && setHover(star)}
             onMouseLeave={() => isLoggedIn && setHover(0)}
           >
             <Star
               size={32}
+              aria-hidden="true"
               fill={star <= (hover || rating) ? "#ff9f1c" : "none"}
               strokeWidth={1.5}
             />

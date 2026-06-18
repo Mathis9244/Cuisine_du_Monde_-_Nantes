@@ -48,14 +48,14 @@ const WheelCountryView: React.FC<WheelCountryViewProps> = ({
           onClick={onBack}
           className="inline-flex items-center gap-2 rounded-full border border-circle-border bg-circle-card/70 px-5 py-3 text-[10px] font-black uppercase tracking-[0.35em] text-circle-frost/70 hover:text-circle-text hover:border-circle-frost/30 transition-colors"
         >
-          <ArrowLeft size={14} />
+          <ArrowLeft size={14} aria-hidden="true" />
           {t("wheel.back")}
         </button>
       </div>
 
       <div className="max-w-4xl mx-auto rounded-[2rem] border border-circle-border bg-circle-card/60 p-5 md:p-6">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-black text-circle-frost/35">
-          <Sparkles size={14} />
+          <Sparkles size={14} aria-hidden="true" />
           <span>{t("wheel.resultsTitle", { country })}</span>
         </div>
         <p className="mt-3 text-sm text-circle-frost/60">
@@ -66,7 +66,9 @@ const WheelCountryView: React.FC<WheelCountryViewProps> = ({
       {loading ? (
         <RestaurantListSkeleton count={4} />
       ) : error ? (
-        <p className="text-center text-red-300 font-bold py-24">{error}</p>
+        <p role="alert" className="text-center text-red-300 font-bold py-24">
+          {error}
+        </p>
       ) : restaurants.length === 0 ? (
         <p className="text-center text-circle-text/30 font-black uppercase tracking-[0.4em] py-24">
           {t("wheel.empty")}

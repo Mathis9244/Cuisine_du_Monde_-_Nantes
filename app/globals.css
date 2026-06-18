@@ -36,6 +36,39 @@ body {
     color 0.3s ease;
 }
 
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #ff9f1c;
+  outline-offset: 3px;
+}
+
+:where(button, [role="button"]) {
+  min-width: 24px;
+  min-height: 24px;
+  touch-action: manipulation;
+}
+
+:where(h1, h2, h3, h4, h5, h6, [id], :focus) {
+  scroll-margin-top: 6rem;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 200;
+  transform: translateY(-180%);
+  border-radius: 0.75rem;
+  background: #ff9f1c;
+  color: #081c1b;
+  padding: 0.75rem 1rem;
+  font-weight: 900;
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -77,11 +110,12 @@ body {
 .gooey-nav-container nav ul li {
   border-radius: 100vw;
   position: relative;
-  cursor: pointer;
   transition: opacity 0.3s ease;
 }
-.gooey-nav-container nav ul li a {
+.gooey-nav-container nav ul li button {
   display: inline-block;
+  border: 0;
+  background: transparent;
   padding: 0.6em 1em;
   font-weight: 800;
   font-size: 0.7rem;
@@ -92,7 +126,7 @@ body {
 }
 
 @media (min-width: 640px) {
-  .gooey-nav-container nav ul li a {
+  .gooey-nav-container nav ul li button {
     padding: 0.8em 1.2em;
     font-size: 0.75rem;
   }
@@ -101,7 +135,7 @@ body {
 .gooey-nav-container nav ul li.active {
   opacity: 1;
 }
-.gooey-nav-container nav ul li.active a {
+.gooey-nav-container nav ul li.active button {
   color: transparent !important;
 }
 .gooey-nav-container nav ul li:not(.active) {
