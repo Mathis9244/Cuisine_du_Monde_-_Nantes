@@ -32,8 +32,8 @@ describe("isAdmin", () => {
     expect(isAdmin(mockUser({ appRole: "admin" }))).toBe(true);
   });
 
-  it("détecte le rôle admin dans user_metadata", () => {
-    expect(isAdmin(mockUser({ userRole: "admin" }))).toBe(true);
+  it("ignore le rôle modifiable dans user_metadata", () => {
+    expect(isAdmin(mockUser({ userRole: "admin" }))).toBe(false);
   });
 
   it("retourne false pour un utilisateur standard", () => {

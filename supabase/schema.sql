@@ -59,8 +59,8 @@ create policy "Lecture publique des restaurants actifs"
 
 -- =============================================================================
 -- Rôle administrateur
--- L'app considère un utilisateur comme admin si son JWT contient role = 'admin'
--- (dans app_metadata.role, défini ci-dessous, ou user_metadata.role).
+-- L'app considère un utilisateur comme admin si auth.users.raw_app_meta_data
+-- contient role = 'admin'. user_metadata n'est jamais utilisé pour les droits.
 --
 -- Promouvoir un utilisateur en admin (remplacer l'email) :
 --

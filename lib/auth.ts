@@ -36,14 +36,12 @@ export async function getCurrentUserFromRequest(
   }
 }
 
-/** Vrai si l'utilisateur a le rôle admin (app_metadata.role ou user_metadata.role). */
+/** Vrai si le rôle administré en base est présent dans app_metadata.role. */
 export function isAdmin(user: User | null): boolean {
   if (!user) return false;
   const appRole = (user.app_metadata as Record<string, unknown> | undefined)
     ?.role;
-  const userRole = (user.user_metadata as Record<string, unknown> | undefined)
-    ?.role;
-  return appRole === ADMIN_ROLE || userRole === ADMIN_ROLE;
+  return appRole === ADMIN_ROLE;
 }
 
 /**
