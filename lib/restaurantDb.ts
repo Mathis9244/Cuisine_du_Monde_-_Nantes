@@ -71,9 +71,9 @@ export function buildRestaurantUpdateRow(
 }
 
 /** Normalise une ligne Supabase pour l'admin (website ← url). */
-export function normalizeDbRestaurantRow<T extends Record<string, unknown>>(
-  row: T,
-): T & { website?: string | null; url?: string | null } {
-  const website = dbWebsite(row as RestaurantUrlSource);
-  return { ...row, website: website ?? (row.website as string | null) };
+export function normalizeDbRestaurantRow(
+  row: DbRestaurant,
+): DbRestaurant {
+  const website = dbWebsite(row);
+  return { ...row, website: website ?? row.website ?? null };
 }

@@ -33,7 +33,7 @@ export async function GET(
   if (!data) {
     return NextResponse.json({ error: "Restaurant introuvable" }, { status: 404 });
   }
-  return NextResponse.json(normalizeDbRestaurantRow(data));
+  return NextResponse.json(normalizeDbRestaurantRow(data as DbRestaurant));
 }
 
 export async function PUT(
@@ -66,5 +66,5 @@ export async function PUT(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(normalizeDbRestaurantRow(data));
+  return NextResponse.json(normalizeDbRestaurantRow(data as DbRestaurant));
 }

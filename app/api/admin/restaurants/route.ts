@@ -61,12 +61,12 @@ export async function POST(request: NextRequest) {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("restaurants")
-    .insert(buildRestaurantInsertRow(body))
+    .insert(buildRestaurantInsertRow({ ...body, name: body.name }))
     .select("*")
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json(normalizeDbRestaurantRow(data), { status: 201 });
+  return NextResponse.json(normalizeDbRestaurantRow(data as DbRestaurant), { status: 201 });
 }
